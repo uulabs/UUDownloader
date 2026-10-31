@@ -103,10 +103,10 @@ fun UuRoot(vm: UuViewModel) {
                     )
 
                     Screen.SETTINGS -> {
-                        LaunchedEffect(Unit) {
-                            vm.loadEngineVersion()
-                            vm.refreshUsage()
-                        }
+                        LaunchedEffect(Unit) { vm.loadEngineVersion() }
+                        // The storage bar has to keep up while the screen is open: a download
+                        // that finishes, or a row removed next door, changes what it should say.
+                        LaunchedEffect(items) { vm.refreshUsage() }
                         SettingsScreen(
                         vm = vm,
                         onBack = { screen = Screen.HOME },
