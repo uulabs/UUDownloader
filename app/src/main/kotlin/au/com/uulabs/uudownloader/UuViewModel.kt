@@ -22,6 +22,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -84,6 +85,9 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
     private companion object {
         /** Long enough for a healthy network, short enough not to feel like a hang. */
         const val PROBE_BUDGET_MS = 45_000L
+
+        /** The update's own network calls have no read timeout; the UI must not rely on them. */
+        const val UPDATE_TIMEOUT_MS = 90_000L
     }
 
     fun onUrlChanged(value: String) {
@@ -141,7 +145,7 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
         updatingEngine = true
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { ytDlp.updateEngine() }
+                runCatching { withTimeout(UPDATE_TIMEOUT_MS) { ytDlp.updateEngine() } }
             }
             updatingEngine = false
             result.fold(

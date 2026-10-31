@@ -108,7 +108,17 @@ one MP4.
 
 ## If a site stops working
 
-Open **Settings → Download engine → Update** first. The bundled yt-dlp is a snapshot, and a
+**YouTube's "sign in to confirm you're not a bot" is a network check, not a video check.** The
+same build downloads the same video on one connection and is refused on another, because the
+refusal is aimed at the address, not at the app. Three things happen in that order:
+
+1. The app retries as the `tv`, `web_safari` and `ios` clients before giving up — YouTube hands
+   the same video to a different client identity more often than it does to a default one.
+2. If every client is refused, the app says so and points at the engine.
+3. **Settings → Download engine → Update**, then try again.
+4. If it still refuses, that network needs a session: add your browser cookies in Settings.
+
+Open **Settings → Download engine → Update** first for anything else. The bundled yt-dlp is a snapshot, and a
 snapshot goes stale: a year-old engine is exactly what YouTube and TikTok break first. Updating
 takes about twenty seconds and does not reinstall the app.
 

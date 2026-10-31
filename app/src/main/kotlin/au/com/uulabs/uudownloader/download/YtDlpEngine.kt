@@ -37,6 +37,18 @@ class YtDlpEngine(
     @Volatile
     private var canMerge = false
 
+    /**
+     * True while a self-update is running.
+     *
+     * The library takes a monitor for both `init` and `updateYoutubeDL`, and the update's
+     * metadata fetch has no read timeout. A download that starts during an update therefore
+     * waits — and the only kind thing to do is say so on the progress line instead of sitting
+     * on "Getting ready" forever.
+     */
+    @Volatile
+    var updating: Boolean = false
+        private set
+
     private val initLock = Any()
 
     /**
@@ -90,11 +102,16 @@ class YtDlpEngine(
 
     /** Fetch a newer yt-dlp from its own release feed. Returns the version now in place. */
     fun updateEngine(): String? {
-        ensureReady()
-        YoutubeDL.updateYoutubeDL(context, YoutubeDL.UpdateChannel.STABLE)
-        val now = YoutubeDL.version(context)
-        UuLog.i("engine updated to $now")
-        return now
+        updating = true
+        try {
+            ensureReady()
+            YoutubeDL.updateYoutubeDL(context, YoutubeDL.UpdateChannel.STABLE)
+            val now = YoutubeDL.version(context)
+            UuLog.i("engine updated to $now")
+            return now
+        } finally {
+            updating = false
+        }
     }
 
     /** yt-dlp's own version, for the About screen. Null until the runtime is unpacked. */
@@ -152,16 +169,76 @@ class YtDlpEngine(
         isCancelled: () -> Boolean,
     ): File {
         ensureReady()
+        var lastError: DownloadFailure? = null
+
+        for ((index, client) in clientLadder(request.url).withIndex()) {
+            try {
+                return attempt(request, client, onProgress, isCancelled)
+            } catch (e: CancelledDownload) {
+                throw e
+            } catch (e: DownloadFailure) {
+                lastError = e
+                val last = index == clientLadder(request.url).lastIndex
+                if (last || !isBotCheck(e)) throw e
+                UuLog.w(
+                    "download ${request.jobId}: ${client ?: "default"} client was refused as a bot " +
+                        "check; retrying as ${clientLadder(request.url)[index + 1] ?: "default"}"
+                )
+                request.workDir.listFiles()?.forEach { it.deleteRecursively() }
+                onProgress(Progress(percent = null, line = "Trying another route"))
+            }
+        }
+        throw lastError ?: DownloadFailure("The site refused the download")
+    }
+
+    /**
+     * Which YouTube clients to try, in order.
+     *
+     * YouTube refuses a request it thinks is automated with "Sign in to confirm you're not a
+     * bot" — pinned to the network, not to the video or the app. The same video will be handed
+     * out to a different client identifier from the same address, so the honest response is to
+     * ask again the way a television or a phone would, before telling the user they need an
+     * account. Non-YouTube URLs get exactly one attempt.
+     */
+    private fun clientLadder(url: String): List<String?> =
+        if (isYouTube(url)) listOf(null, "tv", "web_safari", "ios") else listOf(null)
+
+    private fun isYouTube(url: String): Boolean {
+        val host = url.substringAfter("://", "").substringBefore('/').lowercase()
+        return host.endsWith("youtube.com") || host.endsWith("youtu.be")
+    }
+
+    /** The name for what happened, not what the status code was. */
+    private fun isBotCheck(error: DownloadFailure): Boolean {
+        val text = error.message.orEmpty().lowercase()
+        return text.contains("confirm you're not a bot") ||
+            text.contains("confirm you’re not a bot") ||
+            text.contains("sign in to confirm") ||
+            text.contains("not a bot") ||
+            text.contains("forbidden") ||
+            text.contains("403")
+    }
+
+    private fun attempt(
+        request: DownloadRequest,
+        client: String?,
+        onProgress: (Progress) -> Unit,
+        isCancelled: () -> Boolean,
+    ): File {
         val workDir = request.workDir
         if (!workDir.exists() && !workDir.mkdirs()) {
             throw DownloadFailure("Could not prepare a scratch folder")
         }
         val processId = processIdFor(request.jobId)
 
-        val ytRequest = YoutubeDLRequest(request.url)
         val merge = canMerge
         val selector = QualityChoice.selector(request.quality, merge)
-        UuLog.i("download ${request.jobId}: format=$selector merge=$merge cookies=${cookies() != null}")
+        UuLog.i(
+            "download ${request.jobId}: format=$selector merge=$merge " +
+                "client=${client ?: "default"} cookies=${cookies() != null}"
+        )
+
+        val ytRequest = YoutubeDLRequest(request.url)
         ytRequest.addOption("-f", selector)
         if (merge) ytRequest.addOption("--merge-output-format", "mp4")
         ytRequest.addOption("--no-playlist")
@@ -172,6 +249,7 @@ class YtDlpEngine(
         ytRequest.addOption("--restrict-filenames")
         ytRequest.addOption("-o", File(workDir, "%(title).90s.%(ext)s").absolutePath)
         cookies()?.let { ytRequest.addOption("--cookies", it.absolutePath) }
+        client?.let { ytRequest.addOption("--extractor-args", "youtube:player_client=$it") }
 
         try {
             YoutubeDL.execute(ytRequest, processId) { percent, _eta, line ->
@@ -187,11 +265,9 @@ class YtDlpEngine(
         } catch (e: com.yausername.youtubedl_android.YoutubeDLException) {
             if (isCancelled()) throw CancelledDownload()
             // message is yt-dlp's stderr; when it is blank there is nothing else to read.
-            UuLog.e("download ${request.jobId}: yt-dlp failed", e)
+            UuLog.e("download ${request.jobId}: yt-dlp failed (client=${client ?: "default"})", e)
             throw DownloadFailure(
-                ProgressText.errorMessage(e.message)
-                    ?: UuLog.describe(e)
-                    ?: "The site refused the download",
+                ProgressText.errorMessage(e.message) ?: UuLog.describe(e),
                 e,
             )
         } catch (e: InterruptedException) {

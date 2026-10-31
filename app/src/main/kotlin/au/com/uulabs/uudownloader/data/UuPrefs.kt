@@ -45,6 +45,11 @@ class UuPrefs(context: Context) {
         }.getOrDefault(Quality.HIGH)
         set(value) = prefs.edit().putString(KEY_QUALITY, value.name).apply()
 
+    /** Whether the one-time background engine update has already succeeded on this install. */
+    var engineUpdated: Boolean
+        get() = prefs.getBoolean(KEY_ENGINE_UPDATED, false)
+        set(value) = prefs.edit().putBoolean(KEY_ENGINE_UPDATED, value).apply()
+
     var historyJson: String?
         get() = prefs.getString(KEY_HISTORY, null)
         set(value) = prefs.edit().apply {
@@ -56,5 +61,6 @@ class UuPrefs(context: Context) {
         const val KEY_DEST_LABEL = "dest_label"
         const val KEY_QUALITY = "default_quality"
         const val KEY_HISTORY = "history"
+        const val KEY_ENGINE_UPDATED = "engine_updated"
     }
 }

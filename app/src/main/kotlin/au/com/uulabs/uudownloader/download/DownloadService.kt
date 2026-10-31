@@ -91,7 +91,14 @@ class DownloadService : Service() {
     private fun runJob(item: DownloadItem) {
         val workDir = File(workRoot(), "job-${item.id}")
         workDir.deleteRecursively()
-        mark(item.id) { it.copy(state = DownloadState.PREPARING, detail = "Getting ready", progress = null) }
+        val waitingForUpdate = (engineFor(item.url) as? YtDlpEngine)?.updating == true
+        mark(item.id) {
+            it.copy(
+                state = DownloadState.PREPARING,
+                detail = if (waitingForUpdate) "Waiting for an engine update" else "Getting ready",
+                progress = null,
+            )
+        }
         publishForeground(force = true)
 
         UuLog.i("job ${item.id}: start site=${item.siteLabel} quality=${item.quality} url=${item.url.take(80)}")

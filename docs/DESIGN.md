@@ -103,6 +103,17 @@ it. The app is 97% native payload, so obfuscation saved almost nothing and cost 
 diagnosis. Release builds now keep their names, log every job to the `UUDL` tag, and print the
 throwing class when a message is missing.
 
+## 5b. The update that had to be taken back
+
+yt-dlp ships as a snapshot and a snapshot goes stale, so the obvious idea was to refresh it
+quietly once per install. That was wrong, and it cost a stalled download to find out why:
+`youtubedl-android` holds one monitor across `init` and `updateYoutubeDL`, and the updater's
+metadata fetch has no read timeout. A quiet update on a slow network therefore blocked the first
+download forever, on "Getting ready", with nothing on screen to explain it.
+
+The update is still here, but only where a person asks for it, and a job that starts during an
+update now says "Waiting for an engine update" instead of appearing hung.
+
 ## 6. Where the line is: accounts and regions
 
 Two things came up that the app deliberately does not do.

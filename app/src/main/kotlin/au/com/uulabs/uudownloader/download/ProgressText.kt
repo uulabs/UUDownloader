@@ -45,6 +45,11 @@ object ProgressText {
     fun hint(raw: String?): String {
         val text = raw.orEmpty()
         return when {
+            text.contains("confirm you're not a bot", true) ||
+                text.contains("confirm you’re not a bot", true) ||
+                text.contains("sign in to confirm", true) ->
+                "YouTube is asking this network to sign in. Update the download engine in Settings, " +
+                    "or add your browser cookies if it still refuses."
             text.contains("authentication is required", true) ||
                 text.contains("--cookies", true) ||
                 text.contains("logged-in", true) ||

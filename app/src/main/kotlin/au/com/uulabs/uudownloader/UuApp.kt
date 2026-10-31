@@ -23,5 +23,6 @@ class UuApp : Application() {
                 write = { prefs.historyJson = it },
             )
         )
+
     }
 }
