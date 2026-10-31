@@ -120,8 +120,12 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
         /** The update's own network calls have no read timeout; the UI must not rely on them. */
         const val UPDATE_TIMEOUT_MS = 90_000L
 
-        /** Twice a day is enough to be current without leaning on GitHub's API. */
-        const val UPDATE_INTERVAL_MS = 12 * 60 * 60 * 1000L
+        /**
+         * A cold start is the natural moment to look, and it is self-limiting: a release
+         * published an hour ago should be offered this evening, not tomorrow, while GitHub's
+         * unauthenticated limit (60 an hour) is never in reach of one launch check.
+         */
+        const val UPDATE_INTERVAL_MS = 60 * 60 * 1000L
     }
 
     fun onUrlChanged(value: String) {
