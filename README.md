@@ -67,6 +67,15 @@ Install the one that matches the phone — `adb install -r app/build/outputs/apk
 for anything made in the last decade — or the universal APK if you would rather not think about
 it. Release builds are signed with the debug key: this app is sideloaded, not published.
 
+### The engine ships current
+
+The APK carries yt-dlp **2026.10.26** in its assets and writes it into the wrapper's directory
+before the wrapper initialises, because that wrapper otherwise unpacks whatever snapshot it was
+built with — a snapshot that was a year old and the first thing YouTube refused.
+
+The marker beside the binary stops a bundled copy from ever replacing a *newer* engine fetched
+with **Settings → Download engine → Update**. Bundling is a floor, not a ceiling.
+
 ### Size
 
 | what | per ABI | why it is there |

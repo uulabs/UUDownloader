@@ -66,6 +66,9 @@ class YtDlpEngine(
         if (ready) return
         synchronized(initLock) {
             if (ready) return
+            // Before the library looks, put our engine where it will be found; it only
+            // unpacks its own copy when the file is missing.
+            BundledEngine.ensureInstalled(context)
             UuLog.i("yt-dlp init: unpacking python into ${context.noBackupFilesDir}")
             val started = System.currentTimeMillis()
             YoutubeDL.init(context)
@@ -83,6 +86,10 @@ class YtDlpEngine(
     }
 
     fun isReady(): Boolean = ready
+
+    private fun webUpdateMark(context: android.content.Context, version: String?) {
+        version?.let { BundledEngine.recordInstalled(context, it) }
+    }
 
     /**
      * yt-dlp's version, unpacking the runtime first if this is the first call.
@@ -113,6 +120,7 @@ class YtDlpEngine(
             ensureReady()
             YoutubeDL.updateYoutubeDL(context, YoutubeDL.UpdateChannel.STABLE)
             val now = YoutubeDL.version(context)
+            webUpdateMark(context, now)
             UuLog.i("engine updated to $now")
             return now
         } finally {
