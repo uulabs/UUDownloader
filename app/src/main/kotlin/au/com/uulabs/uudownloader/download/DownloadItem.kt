@@ -36,6 +36,8 @@ data class DownloadItem(
     val savedName: String? = null,
     val savedUri: String? = null,
     val error: String? = null,
+    /** Something the user should know about the file that was saved, e.g. a quality fallback. */
+    val note: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
 ) {
     val siteLabel: String get() = siteName ?: platform.label

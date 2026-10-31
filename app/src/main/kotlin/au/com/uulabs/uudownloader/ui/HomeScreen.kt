@@ -532,7 +532,10 @@ private fun subtitle(item: DownloadItem): String {
         DateUtils.MINUTE_IN_MILLIS,
     ).toString()
     return when (item.state) {
-        DownloadState.DONE -> "Saved · ${item.siteLabel} · $when_"
+        DownloadState.DONE -> buildString {
+            append("Saved · ${item.siteLabel} · $when_")
+            item.note?.let { append(" · ").append(it) }
+        }
         DownloadState.CANCELLED -> "Cancelled"
         else -> item.error ?: "Failed"
     }

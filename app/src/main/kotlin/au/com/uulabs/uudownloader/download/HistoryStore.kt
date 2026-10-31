@@ -48,6 +48,7 @@ class HistoryStore(
         put("savedName", item.savedName ?: JSONObject.NULL)
         put("savedUri", item.savedUri ?: JSONObject.NULL)
         put("error", item.error ?: JSONObject.NULL)
+        put("note", item.note ?: JSONObject.NULL)
         put("createdAt", item.createdAt)
     }
 
@@ -62,6 +63,7 @@ class HistoryStore(
         savedName = json.stringOrNull("savedName"),
         savedUri = json.stringOrNull("savedUri"),
         error = json.stringOrNull("error"),
+        note = json.stringOrNull("note"),
         createdAt = json.optLong("createdAt", System.currentTimeMillis()),
     )
 

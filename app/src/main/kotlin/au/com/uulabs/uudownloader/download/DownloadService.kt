@@ -104,13 +104,21 @@ class DownloadService : Service() {
         UuLog.i("job ${item.id}: start site=${item.siteLabel} quality=${item.quality} url=${item.url.take(80)}")
         try {
             val destination = prefs?.destination ?: Destination.Downloads
-            val file = engineFor(item.url).download(
+            val result = engineFor(item.url).download(
                 request = DownloadRequest(item.id, item.url, item.quality, workDir),
                 onProgress = { progress -> onProgress(item.id, progress) },
                 isCancelled = { cancelled.contains(item.id) },
             )
 
-            mark(item.id) { it.copy(state = DownloadState.SAVING, detail = "Saving to your folder", progress = 1f) }
+            val file = result.file
+            mark(item.id) {
+                it.copy(
+                    state = DownloadState.SAVING,
+                    detail = result.note ?: "Saving to your folder",
+                    progress = 1f,
+                    quality = result.quality,
+                )
+            }
             publishForeground(force = true)
 
             val extension = file.extension.ifEmpty { "mp4" }
@@ -121,7 +129,14 @@ class DownloadService : Service() {
                 is Destination.Custom -> FolderWriter.save(this, destination.uri, file, preferredName)
             }
             DownloadHub.finish(item.id, DownloadState.DONE) {
-                it.copy(savedName = saved.name, savedUri = saved.uri.toString(), progress = 1f, detail = null)
+                it.copy(
+                    savedName = saved.name,
+                    savedUri = saved.uri.toString(),
+                    progress = 1f,
+                    detail = null,
+                    quality = result.quality,
+                    note = result.note,
+                )
             }
             UuLog.i("job ${item.id}: saved as ${saved.name}")
         } catch (e: CancelledDownload) {

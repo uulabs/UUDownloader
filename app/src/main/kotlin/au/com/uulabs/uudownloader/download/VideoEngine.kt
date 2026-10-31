@@ -16,6 +16,16 @@ data class Progress(
     val line: String?,
 )
 
+/**
+ * What came back. Usually the quality that was asked for; occasionally a source refuses that
+ * one and a lower quality is the honest outcome, which the caller has to be able to say.
+ */
+data class DownloadResult(
+    val file: File,
+    val quality: Quality,
+    val note: String? = null,
+)
+
 /** One download job: what to fetch, how good, where the engine may write, and its identity. */
 data class DownloadRequest(
     val jobId: String,
@@ -38,7 +48,7 @@ interface VideoEngine {
         request: DownloadRequest,
         onProgress: (Progress) -> Unit,
         isCancelled: () -> Boolean,
-    ): File
+    ): DownloadResult
 
     /** Stop a job that is already running. Must be safe to call from any thread. */
     fun cancel(jobId: String) {}

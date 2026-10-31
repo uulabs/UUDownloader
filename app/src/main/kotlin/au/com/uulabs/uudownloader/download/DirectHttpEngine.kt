@@ -23,7 +23,7 @@ class DirectHttpEngine : VideoEngine {
         request: DownloadRequest,
         onProgress: (Progress) -> Unit,
         isCancelled: () -> Boolean,
-    ): File {
+    ): DownloadResult {
         val workDir = request.workDir
         if (!workDir.exists() && !workDir.mkdirs()) {
             throw DownloadFailure("Could not prepare a scratch folder")
@@ -69,7 +69,7 @@ class DirectHttpEngine : VideoEngine {
             }
             if (copied == 0L) throw DownloadFailure("The server sent no data")
             onProgress(Progress(percent = 1f, line = null))
-            return target
+            return DownloadResult(target, request.quality)
         } finally {
             connection.disconnect()
         }

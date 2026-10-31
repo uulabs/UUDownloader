@@ -1,6 +1,7 @@
 package au.com.uulabs.uudownloader.download
 
 import android.content.Context
+import au.com.uulabs.uudownloader.core.Quality
 import au.com.uulabs.uudownloader.core.QualityChoice
 import au.com.uulabs.uudownloader.BuildConfig
 import au.com.uulabs.uudownloader.UuLog
@@ -48,6 +49,11 @@ class YtDlpEngine(
     @Volatile
     var updating: Boolean = false
         private set
+
+    /** The refusal from the last attempt, kept so the caller can report it if all of them fail. */
+    @Volatile
+    private var lastFailure: DownloadFailure =
+        DownloadFailure("The site refused the download")
 
     private val initLock = Any()
 
@@ -167,28 +173,58 @@ class YtDlpEngine(
         request: DownloadRequest,
         onProgress: (Progress) -> Unit,
         isCancelled: () -> Boolean,
-    ): File {
+    ): DownloadResult {
         ensureReady()
-        var lastError: DownloadFailure? = null
 
-        for ((index, client) in clientLadder(request.url).withIndex()) {
+        val tried = tryLadder(request, request.quality, onProgress, isCancelled)
+        if (tried != null) return DownloadResult(tried, request.quality)
+
+        // HQ is the adaptive path — separate video and audio streams — and that is the one
+        // YouTube gates when it distrusts an address. Normal asks for a single already-muxed
+        // file, which it still serves. Saving 720p and saying so beats handing back an error
+        // for a video the user can see in front of them.
+        if (request.quality == Quality.HIGH) {
+            UuLog.w("download ${request.jobId}: HQ refused on every client; saving Normal instead")
+            onProgress(Progress(percent = null, line = "HQ refused — saving Normal"))
+            val fallback = tryLadder(request, Quality.NORMAL, onProgress, isCancelled)
+            if (fallback != null) {
+                return DownloadResult(
+                    file = fallback,
+                    quality = Quality.NORMAL,
+                    note = "HQ was refused, so this is the best single file",
+                )
+            }
+        }
+
+        throw lastFailure
+    }
+
+    /** Every client for one quality; null when all of them were refused. */
+    private fun tryLadder(
+        request: DownloadRequest,
+        quality: Quality,
+        onProgress: (Progress) -> Unit,
+        isCancelled: () -> Boolean,
+    ): File? {
+        val ladder = clientLadder(request.url)
+        for ((index, client) in ladder.withIndex()) {
             try {
-                return attempt(request, client, onProgress, isCancelled)
+                return attempt(request, quality, client, onProgress, isCancelled)
             } catch (e: CancelledDownload) {
                 throw e
             } catch (e: DownloadFailure) {
-                lastError = e
-                val last = index == clientLadder(request.url).lastIndex
-                if (last || !isBotCheck(e)) throw e
+                lastFailure = e
+                if (!isBotCheck(e) || index == ladder.lastIndex) return null
+                val next = ladder[index + 1]
                 UuLog.w(
-                    "download ${request.jobId}: ${client ?: "default"} client was refused as a bot " +
-                        "check; retrying as ${clientLadder(request.url)[index + 1] ?: "default"}"
+                    "download ${request.jobId}: ${client ?: "default"} client refused " +
+                        "(${e.message?.take(60)}); retrying as ${next ?: "default"}"
                 )
                 request.workDir.listFiles()?.forEach { it.deleteRecursively() }
                 onProgress(Progress(percent = null, line = "Trying another route"))
             }
         }
-        throw lastError ?: DownloadFailure("The site refused the download")
+        return null
     }
 
     /**
@@ -201,26 +237,30 @@ class YtDlpEngine(
      * account. Non-YouTube URLs get exactly one attempt.
      */
     private fun clientLadder(url: String): List<String?> =
-        if (isYouTube(url)) listOf(null, "tv", "web_safari", "ios") else listOf(null)
+        if (isYouTube(url)) listOf(null, "tv", "web_safari", "ios", "android_vr") else listOf(null)
 
     private fun isYouTube(url: String): Boolean {
         val host = url.substringAfter("://", "").substringBefore('/').lowercase()
         return host.endsWith("youtube.com") || host.endsWith("youtu.be")
     }
 
-    /** The name for what happened, not what the status code was. */
+    /**
+     * Whether the refusal is YouTube being suspicious rather than the video being gone.
+     *
+     * YouTube says the same thing in a dozen ways depending on the client that asked:
+     * "Sign in to confirm you're not a bot", "The page needs to be reloaded", "This content
+     * requires authentication", a bare 403. They all mean the request was not trusted, and all
+     * of them are worth answering with a different client — so the matcher has to know every
+     * phrasing, not the one that happened to appear first.
+     */
     private fun isBotCheck(error: DownloadFailure): Boolean {
         val text = error.message.orEmpty().lowercase()
-        return text.contains("confirm you're not a bot") ||
-            text.contains("confirm you’re not a bot") ||
-            text.contains("sign in to confirm") ||
-            text.contains("not a bot") ||
-            text.contains("forbidden") ||
-            text.contains("403")
+        return BOT_CHECK_PHRASES.any { text.contains(it) }
     }
 
     private fun attempt(
         request: DownloadRequest,
+        quality: Quality,
         client: String?,
         onProgress: (Progress) -> Unit,
         isCancelled: () -> Boolean,
@@ -232,7 +272,7 @@ class YtDlpEngine(
         val processId = processIdFor(request.jobId)
 
         val merge = canMerge
-        val selector = QualityChoice.selector(request.quality, merge)
+        val selector = QualityChoice.selector(quality, merge)
         UuLog.i(
             "download ${request.jobId}: format=$selector merge=$merge " +
                 "client=${client ?: "default"} cookies=${cookies() != null}"
@@ -291,6 +331,22 @@ class YtDlpEngine(
 
     private companion object {
         const val PROBE_PROCESS_ID = "uudl-probe"
+
+        val BOT_CHECK_PHRASES = listOf(
+            "confirm you're not a bot",
+            "confirm you’re not a bot",
+            "not a bot",
+            "sign in to confirm",
+            "page needs to be reloaded",
+            "requires authentication",
+            "requires sign-in",
+            "login required",
+            "sign in to continue",
+            "forbidden",
+            "403",
+            "unable to extract",
+            "no video formats found",
+        )
     }
 
     /**
