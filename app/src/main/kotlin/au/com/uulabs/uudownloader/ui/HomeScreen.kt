@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,6 +72,8 @@ fun HomeScreen(
 ) {
     val running = items.firstOrNull { it.state.isRunning }
     val finished = items.filter { it.state.isTerminal }
+    var detailOf by remember { mutableStateOf<DownloadItem?>(null) }
+    val clipboard = LocalClipboardManager.current
 
     Column(
         Modifier
@@ -141,12 +145,61 @@ fun HomeScreen(
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     finished.take(8).forEach { item ->
-                        RecentRow(item, onOpenFile)
+                        RecentRow(
+                            item = item,
+                            onOpenFile = onOpenFile,
+                            onShowDetail = { detailOf = item },
+                        )
                     }
                 }
             }
             Spacer(Modifier.height(40.dp))
         }
+    }
+
+    detailOf?.let { item ->
+        AlertDialog(
+            onDismissRequest = { detailOf = null },
+            title = { Text("What went wrong", style = MaterialTheme.typography.titleMedium) },
+            text = {
+                Column {
+                    Text(
+                        text = item.error ?: "No details were recorded.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Uu.Text,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    MutedLine("${item.siteLabel} · ${item.url}", color = Uu.Faint)
+                }
+            },
+            confirmButton = {
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(9.dp))
+                        .border(1.dp, Uu.Hairline, RoundedCornerShape(9.dp))
+                        .clickable {
+                            clipboard.setText(AnnotatedString(item.error.orEmpty()))
+                            detailOf = null
+                        }
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Text("Copy", style = MaterialTheme.typography.labelLarge, color = Uu.Text)
+                }
+            },
+            dismissButton = {
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(9.dp))
+                        .clickable { detailOf = null }
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Text("Close", style = MaterialTheme.typography.labelLarge, color = Uu.Muted)
+                }
+            },
+            containerColor = Uu.Surface,
+            textContentColor = Uu.Muted,
+            titleContentColor = Uu.Text,
+        )
     }
 }
 
@@ -422,17 +475,25 @@ private fun ActiveCard(item: DownloadItem, onCancel: () -> Unit) {
 }
 
 @Composable
-private fun RecentRow(item: DownloadItem, onOpenFile: (String) -> Unit) {
+private fun RecentRow(
+    item: DownloadItem,
+    onOpenFile: (String) -> Unit,
+    onShowDetail: () -> Unit,
+) {
     val done = item.state == DownloadState.DONE
+    val failed = item.state == DownloadState.FAILED
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .then(
-                if (done && item.savedUri != null) {
-                    Modifier.clickable { item.savedUri?.let(onOpenFile) }
-                } else {
-                    Modifier
+                when {
+                    done && item.savedUri != null -> Modifier.clickable { item.savedUri?.let(onOpenFile) }
+                    // A two-line row cannot show a yt-dlp error. Tapping it opens the whole
+                    // message with a copy button, so it can be pasted into a bug report
+                    // instead of being photographed.
+                    failed -> Modifier.clickable(onClick = onShowDetail)
+                    else -> Modifier
                 }
             )
             .padding(vertical = 9.dp, horizontal = 4.dp),
