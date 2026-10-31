@@ -32,6 +32,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
+/** Something newer exists, and the user should be told once. */
+sealed interface UpdatePrompt {
+    data class App(val info: ReleaseInfo) : UpdatePrompt
+    data class Engine(val version: String) : UpdatePrompt
+}
+
 /** What the updates row is doing right now. */
 enum class UpdateBusy { NONE, CHECKING, DOWNLOADING }
 
@@ -98,6 +104,10 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
     var updateNote by mutableStateOf<String?>(null)
         private set
 
+    /** Set when a launch check finds something newer than what is installed. */
+    var updatePrompt by mutableStateOf<UpdatePrompt?>(null)
+        private set
+
     var updatingEngine by mutableStateOf(false)
         private set
 
@@ -109,6 +119,9 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
 
         /** The update's own network calls have no read timeout; the UI must not rely on them. */
         const val UPDATE_TIMEOUT_MS = 90_000L
+
+        /** Twice a day is enough to be current without leaning on GitHub's API. */
+        const val UPDATE_INTERVAL_MS = 12 * 60 * 60 * 1000L
     }
 
     fun onUrlChanged(value: String) {
@@ -147,6 +160,66 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
         notice = null
     }
 
+    /**
+     * Ask GitHub, at most twice a day, whether the app or its engine has moved on.
+     *
+     * Never while a download is running: the engine update takes the wrapper's lock, and a
+     * prompt that arrives mid-download is a prompt nobody can act on.
+     */
+    fun checkForUpdatesOnLaunch() {
+        if (DownloadHub.items.value.any { it.state.isRunning }) return
+        val now = System.currentTimeMillis()
+        if (now - prefs.lastUpdateCheck < UPDATE_INTERVAL_MS) return
+        prefs.lastUpdateCheck = now
+
+        viewModelScope.launch {
+            val appResult = withContext(Dispatchers.IO) {
+                AppUpdater.checkForUpdate(BuildConfig.VERSION_NAME)
+            }
+            val info = appResult.getOrNull()
+            if (info != null && info.version != prefs.dismissedAppVersion) {
+                appUpdate = info
+                updatePrompt = UpdatePrompt.App(info)
+                return@launch
+            }
+
+            val installedEngine = engineVersion ?: withContext(Dispatchers.IO) { ytDlp.versionOrInit() }
+            engineVersion = installedEngine ?: engineVersion
+            if (installedEngine == null) return@launch
+
+            val latest = withContext(Dispatchers.IO) {
+                AppUpdater.latestEngineVersion().getOrNull()
+            } ?: return@launch
+            if (AppUpdater.isNewer(latest, installedEngine) && latest != prefs.dismissedEngineVersion) {
+                updatePrompt = UpdatePrompt.Engine(latest)
+            }
+        }
+    }
+
+    fun dismissUpdatePrompt() {
+        when (val prompt = updatePrompt) {
+            is UpdatePrompt.App -> prefs.dismissedAppVersion = prompt.info.version
+            is UpdatePrompt.Engine -> prefs.dismissedEngineVersion = prompt.version
+            null -> return
+        }
+        updatePrompt = null
+    }
+
+    /** Act on whatever the prompt offered; the prompt closes either way. */
+    fun acceptUpdatePrompt(onMessage: (String) -> Unit) {
+        when (val prompt = updatePrompt) {
+            is UpdatePrompt.App -> {
+                updatePrompt = null
+                installAppUpdate()
+            }
+            is UpdatePrompt.Engine -> {
+                updatePrompt = null
+                updateEngine(onMessage)
+            }
+            null -> Unit
+        }
+    }
+
     fun checkAppUpdate() {
         if (updateBusy != UpdateBusy.NONE) return
         updateBusy = UpdateBusy.CHECKING
@@ -169,6 +242,14 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
     fun installAppUpdate() {
         val info = appUpdate ?: return
         if (updateBusy != UpdateBusy.NONE) return
+
+        // Asking Android for the permission first is cheaper than downloading 60 MB to find
+        // out that the installer will not open.
+        if (!AppUpdater.canInstall(getApplication())) {
+            updateNote = "Allow UU Downloader to install apps, then press Install again"
+            AppUpdater.openInstallPermission(getApplication())
+            return
+        }
         updateBusy = UpdateBusy.DOWNLOADING
         updateProgress = 0f
         viewModelScope.launch {
@@ -351,6 +432,6 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Site name for the chip under the field, e.g. "Instagram", "Pornhub" or "Vimeo". */
+    /** Site name for the chip under the field, e.g. "Instagram" or "Vimeo". */
     fun siteLabel(): String = link?.siteName ?: Platform.OTHER.label
 }

@@ -34,7 +34,7 @@ object AppUpdater {
     private const val USER_AGENT = "UU-Downloader-Android"
 
     fun checkForUpdate(currentVersion: String): Result<ReleaseInfo?> = runCatching {
-        val json = JSONObject(httpGet(LATEST))
+        val json = githubJson(LATEST)
         val tag = json.optString("tag_name").removePrefix("v").removePrefix("V")
         if (tag.isBlank()) return@runCatching null
         if (!isNewer(tag, currentVersion)) return@runCatching null
@@ -71,6 +71,13 @@ object AppUpdater {
     fun download(context: Context, info: ReleaseInfo, onProgress: (Float) -> Unit): File {
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
         val target = File(dir, info.assetName)
+
+        // A first attempt can stop at Android's "allow installs from this source" prompt. The
+        // bytes are already here, so that detour must not cost another 60 MB.
+        if (target.exists() && info.sizeBytes > 0 && target.length() == info.sizeBytes) {
+            UuLog.i("app update: reusing the cached ${info.assetName}")
+            return target
+        }
         if (target.exists()) target.delete()
 
         val connection = (URL(info.assetUrl).openConnection() as HttpURLConnection).apply {
@@ -110,6 +117,20 @@ object AppUpdater {
         }
     }
 
+    /** Whether Android will even show the installer for this app. */
+    fun canInstall(context: Context): Boolean = runCatching {
+        context.packageManager.canRequestPackageInstalls()
+    }.getOrDefault(true)
+
+    /** Send the user straight to the toggle they need, rather than to Settings at large. */
+    fun openInstallPermission(context: Context) {
+        val intent = Intent(
+            android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+            android.net.Uri.parse("package:${context.packageName}"),
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(intent) }
+    }
+
     /** Hand the APK to the system installer. Android still asks the user to confirm. */
     fun install(context: Context, apk: File) {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.updates", apk)
@@ -118,6 +139,14 @@ object AppUpdater {
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
     }
+
+    /** Latest published yt-dlp tag, for the engine update prompt. */
+    fun latestEngineVersion(): Result<String?> = runCatching {
+        val json = githubJson("https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest")
+        json.optString("tag_name").trim().takeIf { it.isNotEmpty() }
+    }
+
+    internal fun githubJson(url: String): JSONObject = JSONObject(httpGet(url))
 
     private fun httpGet(url: String): String {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {

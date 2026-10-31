@@ -66,6 +66,23 @@ class UuPrefs(context: Context) {
         get() = prefs.getBoolean(KEY_ENGINE_UPDATED, false)
         set(value) = prefs.edit().putBoolean(KEY_ENGINE_UPDATED, value).apply()
 
+    var lastUpdateCheck: Long
+        get() = prefs.getLong(KEY_LAST_UPDATE_CHECK, 0L)
+        set(value) = prefs.edit().putLong(KEY_LAST_UPDATE_CHECK, value).apply()
+
+    /** An app version the user said "later" to, so the prompt does not repeat every launch. */
+    var dismissedAppVersion: String?
+        get() = prefs.getString(KEY_DISMISSED_APP, null)
+        set(value) = prefs.edit().apply {
+            if (value == null) remove(KEY_DISMISSED_APP) else putString(KEY_DISMISSED_APP, value)
+        }.apply()
+
+    var dismissedEngineVersion: String?
+        get() = prefs.getString(KEY_DISMISSED_ENGINE, null)
+        set(value) = prefs.edit().apply {
+            if (value == null) remove(KEY_DISMISSED_ENGINE) else putString(KEY_DISMISSED_ENGINE, value)
+        }.apply()
+
     var historyJson: String?
         get() = prefs.getString(KEY_HISTORY, null)
         set(value) = prefs.edit().apply {
@@ -81,5 +98,8 @@ class UuPrefs(context: Context) {
         const val KEY_LIMIT_MODE = "limit_mode"
         const val KEY_LIMIT_GB = "limit_gb"
         const val KEY_LIMIT_PERCENT = "limit_percent"
+        const val KEY_LAST_UPDATE_CHECK = "last_update_check"
+        const val KEY_DISMISSED_APP = "dismissed_app_version"
+        const val KEY_DISMISSED_ENGINE = "dismissed_engine_version"
     }
 }

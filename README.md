@@ -35,13 +35,12 @@ screen, nothing to configure before it works.
 Whatever yt-dlp supports, which is most of the video web — the app has no allow-list.
 
 The six the app names itself are YouTube, TikTok, Instagram, Facebook, X and Reddit; those get
-their own label in the list. Everything else goes through the same engine and is named after
-its domain, so a Pornhub or Xvideos link shows up as "Pornhub" or "Xvideos" and downloads
-exactly like a YouTube one does.
+their own label in the list. Everything else goes through the same engine and is named after its
+domain, so an unfamiliar link shows up as the site it came from rather than as "Link".
 
-The bundled build (yt-dlp 2025.11.12, 1041 extractor modules) carries dedicated extractors for
-Pornhub, Xvideos, XNXX, RedTube, SpankBang, Eporner, YouPorn, Txxx and Tube8 alongside the
-social networks.
+That includes adult sites, which have their own extractors in the engine and download exactly
+the way any other site does. They are not listed here and the app keeps no catalogue of them:
+the link goes to yt-dlp, so whether a given one works is that site's business.
 
 **No VPN is involved, and none is needed by the app.** The download goes out on the phone's own
 connection — nothing is proxied, tunnelled or routed around anything. If you run a VPN on the
@@ -87,7 +86,7 @@ it. Release builds are signed with the debug key: this app is sideloaded, not pu
 
 ### The engine ships current
 
-The APK carries yt-dlp **2026.10.26** in its assets and writes it into the wrapper's directory
+The APK carries a current yt-dlp in its assets (2026.10.26 at the time of writing) and writes it into the wrapper's directory
 before the wrapper initialises, because that wrapper otherwise unpacks whatever snapshot it was
 built with — a snapshot that was a year old and the first thing YouTube refused.
 

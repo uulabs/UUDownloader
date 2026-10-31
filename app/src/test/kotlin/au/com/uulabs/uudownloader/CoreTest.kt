@@ -64,14 +64,11 @@ class CoreTest {
     @Test
     fun `an unnamed site is called by its own name, not by "Link"`() {
         assertEquals(
-            "Pornhub",
-            SocialLinks.parse("https://www.pornhub.com/view_video.php?viewkey=abc")!!.siteName,
-        )
-        assertEquals(
-            "Xvideos",
-            SocialLinks.parse("https://www.xvideos.com/video123/some_title")!!.siteName,
+            "Example",
+            SocialLinks.parse("https://www.example.com/watch?v=abc")!!.siteName,
         )
         assertEquals("Vimeo", SocialLinks.parse("https://vimeo.com/12345")!!.siteName)
+        assertEquals("Dailymotion", SocialLinks.parse("https://www.dailymotion.com/x")!!.siteName)
         assertEquals("Example", SocialLinks.siteNameOf("ew.example.co.uk"))
         assertEquals("Spank Bang", SocialLinks.siteNameOf("spank-bang.com"))
     }

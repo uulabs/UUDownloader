@@ -26,7 +26,7 @@ data class DownloadItem(
     val platform: Platform,
     val quality: Quality,
     val state: DownloadState,
-    /** "Pornhub", "Vimeo", … when the site is not one of the five named platforms. */
+    /** The site's own name when it is not one of the six named platforms. */
     val siteName: String? = null,
     val title: String? = null,
     /** 0f..1f, or null while the size is not known yet. */

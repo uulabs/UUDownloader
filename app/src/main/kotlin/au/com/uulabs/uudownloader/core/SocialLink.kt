@@ -18,8 +18,8 @@ enum class Platform(val label: String, private val hosts: List<String>) {
     /**
      * A link the app does not recognise by name.
      *
-     * This is the majority of what yt-dlp handles — Pornhub, Xvideos, Vimeo and a thousand
-     * others — and it is deliberately not an allow-list. It is still worth trying: yt-dlp knows a few
+     * This is the majority of what yt-dlp handles — a thousand sites, adult ones among them —
+     * and it is deliberately not an allow-list. It is still worth trying: yt-dlp knows a few
      * thousand sites, and refusing a Vimeo link because the label would read "Link" is worse
      * than the label reading "Link".
      */
@@ -37,7 +37,7 @@ data class SocialLink(val url: String, val host: String, val platform: Platform)
      * What to call the place the video came from.
      *
      * The five sites named in the app get their own label. Everything else — and that is
-     * thousands of sites, from Vimeo to Pornhub to a niche blog — is named after its domain,
+     * thousands of sites, adult ones included — is named after its domain,
      * because "Link" tells the user nothing about where their video went.
      */
     val siteName: String
@@ -90,7 +90,7 @@ object SocialLinks {
         "co.uk", "com.au", "co.nz", "co.za", "com.br", "co.jp", "com.mx", "co.in", "com.tr",
     )
 
-    /** "www.pornhub.com" -> "Pornhub", "ew.example.co.uk" -> "Example". */
+    /** "www.example.com" -> "Example", "ew.example.co.uk" -> "Example". */
     fun siteNameOf(host: String): String {
         val parts = host.lowercase().removePrefix("www.").split('.').filter { it.isNotEmpty() }
         if (parts.isEmpty()) return "Site"

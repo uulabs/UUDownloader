@@ -10,6 +10,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +25,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +44,7 @@ import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import au.com.uulabs.uudownloader.data.Destination
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import au.com.uulabs.uudownloader.UpdatePrompt
 import au.com.uulabs.uudownloader.UuViewModel
 
 private enum class Screen { HOME, SETTINGS, ABOUT }
@@ -75,6 +84,66 @@ fun UuRoot(vm: UuViewModel) {
                 Toast.makeText(context, problem, Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    // One check per launch, at most twice a day, for both the app and its engine.
+    LaunchedEffect(Unit) { vm.checkForUpdatesOnLaunch() }
+
+    vm.updatePrompt?.let { prompt ->
+        val engine = prompt is UpdatePrompt.Engine
+        AlertDialog(
+            onDismissRequest = { vm.dismissUpdatePrompt() },
+            title = {
+                Text(
+                    text = if (engine) "Download engine update" else "UU Downloader update",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Uu.Text,
+                )
+            },
+            text = {
+                MutedLine(
+                    text = when (prompt) {
+                        is UpdatePrompt.App ->
+                            "Version ${prompt.info.version} is ready to install. Android will ask you to confirm."
+                        is UpdatePrompt.Engine ->
+                            "yt-dlp ${prompt.version} is available. Updating is what keeps YouTube and the rest working as they change."
+                    },
+                    color = Uu.Muted,
+                )
+            },
+            confirmButton = {
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(9.dp))
+                        .border(1.dp, Uu.Hairline, RoundedCornerShape(9.dp))
+                        .clickable {
+                            vm.acceptUpdatePrompt { message ->
+                                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = if (engine) "Update" else "Install",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Uu.Text,
+                    )
+                }
+            },
+            dismissButton = {
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(9.dp))
+                        .clickable { vm.dismissUpdatePrompt() }
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Text("Later", style = MaterialTheme.typography.labelLarge, color = Uu.Muted)
+                }
+            },
+            containerColor = Uu.Surface,
+            textContentColor = Uu.Muted,
+            titleContentColor = Uu.Text,
+        )
     }
 
     BackHandler(enabled = screen != Screen.HOME) { screen = Screen.HOME }

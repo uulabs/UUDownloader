@@ -61,12 +61,18 @@ def soft_radial(centre: tuple[float, float], radius: float, peak: int = 255) -> 
 
 
 def glyph_mask(scale: float = 1.0, offset_y: float = 0.0) -> Image.Image:
-    """The download mark: shaft, arrowhead and a tray, on transparent."""
+    """
+    The mark: a U whose bowl comes to a point, which makes it read as a down arrow too.
+
+    The first version was an arrow dropping into a tray — the same picture every downloader
+    uses. This one carries the initial instead: one stroke, no tray, no art, and it still says
+    "down" because the bottom is a point rather than a curve.
+    """
     mask = Image.new("L", (S, S), 0)
     draw = ImageDraw.Draw(mask)
 
     cx = 512.0
-    cy = 514.0 + offset_y
+    cy = 512.0 + offset_y
 
     def x(v: float) -> float:
         return scaled(cx + v * scale)
@@ -74,34 +80,21 @@ def glyph_mask(scale: float = 1.0, offset_y: float = 0.0) -> Image.Image:
     def y(v: float) -> float:
         return scaled(cy + v * scale)
 
-    def r(v: float) -> float:
-        return scaled(v * scale)
-
-    # Shaft, capped in a half circle so it does not read as a rectangle.
-    draw.rounded_rectangle(
-        [x(-34), y(-244), x(34), y(-66)],
-        radius=r(34),
+    stroke = int(round(scaled(112 * scale)))
+    half = 177.0
+    draw.line(
+        [(x(-half), y(-244)), (x(-half), y(22)), (x(0), y(236)), (x(half), y(22)), (x(half), y(-244))],
         fill=255,
+        width=stroke,
+        joint="curve",
     )
-    # Arrowhead.
-    draw.polygon(
-        [(x(-132), y(-72)), (x(132), y(-72)), (x(0), y(58))],
-        fill=255,
-    )
-    # Tray: two uprights and a floor, each a softly squared block so the joins read as one
-    # shape without turning into blobs at 48dp.
-    stroke = 46.0
-    for arm in (-150.0, 150.0):
-        draw.rounded_rectangle(
-            [x(arm - stroke / 2), y(152), x(arm + stroke / 2), y(214)],
-            radius=r(9),
+    # Square-ish ends, softened just enough not to look cut off at 48dp.
+    for end_x, end_y in ((-half, -244), (half, -244)):
+        radius = stroke / 2
+        draw.ellipse(
+            [x(end_x) - radius, y(end_y) - radius, x(end_x) + radius, y(end_y) + radius],
             fill=255,
         )
-    draw.rounded_rectangle(
-        [x(-150 - stroke / 2), y(214 - stroke / 2), x(150 + stroke / 2), y(214 + stroke / 2)],
-        radius=r(9),
-        fill=255,
-    )
     return mask
 
 
@@ -126,6 +119,17 @@ def compose_tile() -> Image.Image:
     )
 
     tile.paste(paint, (0, 0), mark)
+
+    # Inner edge: one pixel of light along the top of the tile, so a black square does not sit
+    # completely flat against a black launcher.
+    edge = Image.new("L", (S, S), 0)
+    ImageDraw.Draw(edge).line(
+        [(scaled(26), scaled(3)), (S - scaled(26), scaled(3))], fill=255, width=int(scaled(3))
+    )
+    edge = edge.filter(ImageFilter.GaussianBlur(scaled(6)))
+    tile = Image.composite(
+        Image.new("RGB", (S, S), (255, 255, 255)), tile, edge.point(lambda v: int(v * 0.10))
+    )
 
     out = tile.convert("RGBA")
     out.putalpha(rounded_mask(232))
