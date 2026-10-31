@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.painterResource
 import au.com.uulabs.uudownloader.BuildConfig
 import au.com.uulabs.uudownloader.R
+import au.com.uulabs.uudownloader.UpdateBusy
 import au.com.uulabs.uudownloader.UuViewModel
 import au.com.uulabs.uudownloader.core.Quality
 import androidx.compose.ui.graphics.Color
@@ -210,6 +211,62 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.labelLarge,
                             fontSize = 13.sp,
                             color = if (vm.updatingEngine) Uu.Faint else Uu.Text.copy(alpha = 0.8f),
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(26.dp))
+            Eyebrow("App updates")
+            Spacer(Modifier.height(10.dp))
+            Panel(Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = "Version ${BuildConfig.VERSION_NAME}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontSize = 14.5.sp,
+                            color = Uu.Text,
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        val status = when {
+                            vm.updateBusy == UpdateBusy.DOWNLOADING ->
+                                "Downloading ${((vm.updateProgress ?: 0f) * 100).toInt()}%"
+                            vm.updateBusy == UpdateBusy.CHECKING -> "Checking GitHub…"
+                            vm.appUpdate != null -> "${vm.appUpdate?.version} is available"
+                            else -> vm.updateNote ?: "Checked against GitHub releases"
+                        }
+                        MutedLine(status, color = if (vm.appUpdate != null) Uu.Text else Uu.Faint)
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    val installable = vm.appUpdate != null
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(9.dp))
+                            .border(
+                                1.dp,
+                                if (installable) Uu.Text.copy(alpha = 0.45f) else Uu.Hairline,
+                                RoundedCornerShape(9.dp),
+                            )
+                            .clickable(enabled = vm.updateBusy == UpdateBusy.NONE) {
+                                if (installable) vm.installAppUpdate() else vm.checkAppUpdate()
+                            }
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                    ) {
+                        Text(
+                            text = when {
+                                vm.updateBusy != UpdateBusy.NONE -> "Working"
+                                installable -> "Install"
+                                else -> "Check"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            fontSize = 13.sp,
+                            color = if (vm.updateBusy == UpdateBusy.NONE) Uu.Text.copy(alpha = 0.85f) else Uu.Faint,
                         )
                     }
                 }

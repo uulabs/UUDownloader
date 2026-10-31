@@ -52,6 +52,24 @@ sign-in, or puts up an age check, the app reports the site's own answer in plain
 stops: it does not scramble its identity, mint tokens, or try to look like somewhere it isn't.
 Those are the site's rules to set, and the request either passes them honestly or fails.
 
+## Updating
+
+The app checks **its own GitHub releases** (`uulabs/UUDownloader`) from
+**Settings → App updates → Check**. If a newer tag exists it offers Install, downloads the APK
+that matches the phone's architecture, and hands it to Android's package installer — which
+still asks the user to confirm. Nothing installs itself.
+
+For that to find anything, a release has to exist with these assets attached:
+
+```
+UUDownloader-<version>-arm64.apk
+UUDownloader-<version>-armv7.apk
+UUDownloader-<version>-universal.apk
+```
+
+The tag is the version (`v1.2.0`), and the updater matches assets by name, so the arm64 phone
+picks `…-arm64.apk` and falls back to universal if that is all there is.
+
 ## Build
 
 Requires JDK 17+ and an Android SDK with platform 36. Nothing else.

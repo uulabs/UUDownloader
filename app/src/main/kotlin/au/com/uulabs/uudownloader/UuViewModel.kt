@@ -17,6 +17,8 @@ import au.com.uulabs.uudownloader.download.DownloadHub
 import au.com.uulabs.uudownloader.download.DownloadItem
 import au.com.uulabs.uudownloader.download.DownloadService
 import au.com.uulabs.uudownloader.download.SavedFileRemover
+import au.com.uulabs.uudownloader.update.AppUpdater
+import au.com.uulabs.uudownloader.update.ReleaseInfo
 import au.com.uulabs.uudownloader.download.SourceInfo
 import au.com.uulabs.uudownloader.download.YtDlpEngine
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +31,9 @@ import kotlinx.coroutines.withTimeout
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+
+/** What the updates row is doing right now. */
+enum class UpdateBusy { NONE, CHECKING, DOWNLOADING }
 
 /** What happened to a link that arrived from the share sheet. */
 enum class ShareOutcome {
@@ -80,6 +85,19 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
     var engineVersion by mutableStateOf<String?>(null)
         private set
 
+    var appUpdate by mutableStateOf<ReleaseInfo?>(null)
+        private set
+
+    var updateBusy by mutableStateOf(UpdateBusy.NONE)
+        private set
+
+    var updateProgress by mutableStateOf<Float?>(null)
+        private set
+
+    /** One line of plain feedback for the updates row. */
+    var updateNote by mutableStateOf<String?>(null)
+        private set
+
     var updatingEngine by mutableStateOf(false)
         private set
 
@@ -127,6 +145,46 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissNotice() {
         notice = null
+    }
+
+    fun checkAppUpdate() {
+        if (updateBusy != UpdateBusy.NONE) return
+        updateBusy = UpdateBusy.CHECKING
+        updateNote = null
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                AppUpdater.checkForUpdate(BuildConfig.VERSION_NAME)
+            }
+            updateBusy = UpdateBusy.NONE
+            result.fold(
+                onSuccess = { info ->
+                    appUpdate = info
+                    if (info == null) updateNote = "Up to date"
+                },
+                onFailure = { updateNote = it.message ?: "Couldn't reach GitHub" },
+            )
+        }
+    }
+
+    fun installAppUpdate() {
+        val info = appUpdate ?: return
+        if (updateBusy != UpdateBusy.NONE) return
+        updateBusy = UpdateBusy.DOWNLOADING
+        updateProgress = 0f
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { AppUpdater.download(getApplication(), info) { p -> updateProgress = p } }
+            }
+            updateBusy = UpdateBusy.NONE
+            updateProgress = null
+            result.fold(
+                onSuccess = { file ->
+                    val opened = runCatching { AppUpdater.install(getApplication(), file) }
+                    if (opened.isFailure) updateNote = "Couldn't open the installer"
+                },
+                onFailure = { updateNote = it.message ?: "Download failed" },
+            )
+        }
     }
 
     /** Read the engine version once, off the main thread; the first call unpacks Python. */
