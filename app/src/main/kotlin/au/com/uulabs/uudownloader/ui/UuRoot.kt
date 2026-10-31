@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -101,13 +102,19 @@ fun UuRoot(vm: UuViewModel) {
                         onOpenFile = { uri -> openVideo(context, uri) },
                     )
 
-                    Screen.SETTINGS -> SettingsScreen(
+                    Screen.SETTINGS -> {
+                        LaunchedEffect(Unit) { vm.loadEngineVersion() }
+                        SettingsScreen(
                         vm = vm,
                         onBack = { screen = Screen.HOME },
                         onChooseFolder = { folderPicker.launch(startFolder) },
                         onPickCookies = { cookiePicker.launch("*/*") },
                         onOpenAbout = { screen = Screen.ABOUT },
-                    )
+                        onEngineMessage = { message ->
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                        },
+                        )
+                    }
 
                     Screen.ABOUT -> AboutScreen(onBack = { screen = Screen.SETTINGS })
                 }

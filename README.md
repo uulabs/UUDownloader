@@ -21,6 +21,8 @@ screen, nothing to configure before it works.
   the button disappears rather than handing the user two names for the same file.
 - **A folder that just works.** Videos land in `Download/UU Downloader` with no setup, no
   permission prompt. A different folder can be chosen through the system picker.
+- **A download engine that can update itself.** Settings shows the yt-dlp version and a button
+  that fetches the latest one from its own release feed. Sites change; this is what follows them.
 - **Sign-in when you have one, never required.** Reddit, private Instagram posts and a few other
   sites will only answer a signed-in request. Settings takes a `cookies.txt` exported from your
   own browser and hands it to the engine. Nothing is signed in by default and nothing else is
@@ -103,6 +105,25 @@ Two engines, picked by what the link is:
 The yt-dlp engine comes from [youtubedl-android](https://github.com/yausername/youtubedl-android)
 (`0.18.1`), with the matching ffmpeg module for merging separate video and audio streams into
 one MP4.
+
+## If a site stops working
+
+Open **Settings → Download engine → Update** first. The bundled yt-dlp is a snapshot, and a
+snapshot goes stale: a year-old engine is exactly what YouTube and TikTok break first. Updating
+takes about twenty seconds and does not reinstall the app.
+
+If an error mentions the site's own words — *"Your IP address is blocked from accessing this
+post"*, *"This video is private"*, *"Account authentication is required"* — the app is quoting
+the site, and no update will change its mind.
+
+### A note on 1.0 and R8
+
+Version 1.0 shipped a release build that failed on every first run with a four-character error.
+R8 had stripped a class that the yt-dlp wrapper registers by name when it unpacks Python
+(`AsiExtraField` from Apache Commons Compress), so the runtime could never start. It worked on
+one test handset only because an earlier debug build had already unpacked Python there. The keep
+rules in `app/proguard-rules.pro` now pin that library, release builds keep their class names,
+and every failure is logged under the `UUDL` tag with the real exception.
 
 ## Limitations, honestly
 

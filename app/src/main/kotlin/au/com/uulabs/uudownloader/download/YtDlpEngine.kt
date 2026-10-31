@@ -3,6 +3,7 @@ package au.com.uulabs.uudownloader.download
 import android.content.Context
 import au.com.uulabs.uudownloader.core.QualityChoice
 import au.com.uulabs.uudownloader.BuildConfig
+import au.com.uulabs.uudownloader.UuLog
 import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
@@ -47,17 +48,54 @@ class YtDlpEngine(
         if (ready) return
         synchronized(initLock) {
             if (ready) return
+            UuLog.i("yt-dlp init: unpacking python into ${context.noBackupFilesDir}")
+            val started = System.currentTimeMillis()
             YoutubeDL.init(context)
+            UuLog.i("yt-dlp init: python ready in ${System.currentTimeMillis() - started} ms")
             canMerge = if (BuildConfig.UU_FFMPEG) {
-                runCatching { FFmpeg.init(context) }.isSuccess
+                runCatching { FFmpeg.init(context) }
+                    .onFailure { UuLog.w("ffmpeg init failed; falling back to single-file formats", it) }
+                    .isSuccess
             } else {
                 false
             }
+            UuLog.i("yt-dlp init: complete, canMerge=$canMerge")
             ready = true
         }
     }
 
     fun isReady(): Boolean = ready
+
+    /**
+     * yt-dlp's version, unpacking the runtime first if this is the first call.
+     *
+     * The bundled binary is whatever shipped with the library, and the sites it knows about
+     * change weekly. Showing the date is how a user can tell whether "this site stopped
+     * working" is their problem or the engine's.
+     */
+    fun versionOrInit(): String? = runCatching {
+        ensureReady()
+        // The library only records a version after it has performed an update, so a fresh
+        // install knows nothing. Ask the binary itself in that case.
+        YoutubeDL.version(context) ?: askBinaryVersion()
+    }.getOrNull()
+
+    private fun askBinaryVersion(): String? = runCatching {
+        YoutubeDL.execute(YoutubeDLRequest("").addOption("--version"))
+            .out
+            .lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.isNotEmpty() && it.first().isDigit() }
+    }.getOrNull()
+
+    /** Fetch a newer yt-dlp from its own release feed. Returns the version now in place. */
+    fun updateEngine(): String? {
+        ensureReady()
+        YoutubeDL.updateYoutubeDL(context, YoutubeDL.UpdateChannel.STABLE)
+        val now = YoutubeDL.version(context)
+        UuLog.i("engine updated to $now")
+        return now
+    }
 
     /** yt-dlp's own version, for the About screen. Null until the runtime is unpacked. */
     fun toolVersion(): String? = runCatching {
@@ -122,7 +160,9 @@ class YtDlpEngine(
 
         val ytRequest = YoutubeDLRequest(request.url)
         val merge = canMerge
-        ytRequest.addOption("-f", QualityChoice.selector(request.quality, merge))
+        val selector = QualityChoice.selector(request.quality, merge)
+        UuLog.i("download ${request.jobId}: format=$selector merge=$merge cookies=${cookies() != null}")
+        ytRequest.addOption("-f", selector)
         if (merge) ytRequest.addOption("--merge-output-format", "mp4")
         ytRequest.addOption("--no-playlist")
         ytRequest.addOption("--newline")
@@ -146,13 +186,20 @@ class YtDlpEngine(
             throw CancelledDownload()
         } catch (e: com.yausername.youtubedl_android.YoutubeDLException) {
             if (isCancelled()) throw CancelledDownload()
+            // message is yt-dlp's stderr; when it is blank there is nothing else to read.
+            UuLog.e("download ${request.jobId}: yt-dlp failed", e)
             throw DownloadFailure(
-                ProgressText.errorMessage(e.message) ?: "The site refused the download",
+                ProgressText.errorMessage(e.message)
+                    ?: UuLog.describe(e)
+                    ?: "The site refused the download",
                 e,
             )
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
             throw CancelledDownload()
+        } catch (e: Throwable) {
+            UuLog.e("download ${request.jobId}: engine threw", e)
+            throw e
         }
 
         return finishedFileIn(workDir)

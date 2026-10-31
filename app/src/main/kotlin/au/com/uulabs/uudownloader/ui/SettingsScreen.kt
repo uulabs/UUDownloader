@@ -47,6 +47,7 @@ fun SettingsScreen(
     onChooseFolder: () -> Unit,
     onPickCookies: () -> Unit,
     onOpenAbout: () -> Unit,
+    onEngineMessage: (String) -> Unit,
 ) {
     Column(
         Modifier
@@ -159,6 +160,48 @@ fun SettingsScreen(
                         selected = vm.quality == Quality.NORMAL,
                         onClick = { vm.selectQuality(Quality.NORMAL) },
                     )
+                }
+            }
+
+            Spacer(Modifier.height(26.dp))
+            Eyebrow("Download engine")
+            Spacer(Modifier.height(10.dp))
+            Panel(Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = "yt-dlp ${vm.engineVersion ?: "…"}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontSize = 14.5.sp,
+                            color = Uu.Text,
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        MutedLine(
+                            if (vm.updatingEngine) "Fetching the latest release…"
+                            else "The sites change; this is what follows them.",
+                            color = Uu.Faint,
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(9.dp))
+                            .border(1.dp, Uu.Hairline, RoundedCornerShape(9.dp))
+                            .clickable(enabled = !vm.updatingEngine) { vm.updateEngine(onEngineMessage) }
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                    ) {
+                        Text(
+                            text = if (vm.updatingEngine) "Updating" else "Update",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontSize = 13.sp,
+                            color = if (vm.updatingEngine) Uu.Faint else Uu.Text.copy(alpha = 0.8f),
+                        )
+                    }
                 }
             }
 

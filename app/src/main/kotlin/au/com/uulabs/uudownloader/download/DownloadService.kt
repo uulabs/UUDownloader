@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import au.com.uulabs.uudownloader.UuLog
 import au.com.uulabs.uudownloader.core.DirectLinks
 import au.com.uulabs.uudownloader.core.FileNames
 import au.com.uulabs.uudownloader.core.Platform
@@ -45,6 +46,7 @@ class DownloadService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        UuLog.i("service created")
         prefs = UuPrefs(this)
         DownloadNotifications.ensureChannel(this)
     }
@@ -92,6 +94,7 @@ class DownloadService : Service() {
         mark(item.id) { it.copy(state = DownloadState.PREPARING, detail = "Getting ready", progress = null) }
         publishForeground(force = true)
 
+        UuLog.i("job ${item.id}: start site=${item.siteLabel} quality=${item.quality} url=${item.url.take(80)}")
         try {
             val destination = prefs?.destination ?: Destination.Downloads
             val file = engineFor(item.url).download(
@@ -113,10 +116,15 @@ class DownloadService : Service() {
             DownloadHub.finish(item.id, DownloadState.DONE) {
                 it.copy(savedName = saved.name, savedUri = saved.uri.toString(), progress = 1f, detail = null)
             }
+            UuLog.i("job ${item.id}: saved as ${saved.name}")
         } catch (e: CancelledDownload) {
+            UuLog.i("job ${item.id}: cancelled")
             DownloadHub.finish(item.id, DownloadState.CANCELLED) { it.copy(detail = null) }
         } catch (e: Throwable) {
-            val message = ProgressText.hint(e.message).ifBlank { "Something went wrong" }
+            UuLog.e("job ${item.id}: failed", e)
+            // A message-less throwable used to render as the word "wrong"; the class name is
+            // at least a fingerprint that can be searched for.
+            val message = ProgressText.hint(e.message).ifBlank { UuLog.describe(e) }
             DownloadHub.finish(item.id, DownloadState.FAILED) {
                 it.copy(detail = null, error = message.take(180))
             }

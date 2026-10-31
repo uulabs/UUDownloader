@@ -73,6 +73,12 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
     var cookieCount by mutableStateOf(if (jar.exists) jar.cookieCount else 0)
         private set
 
+    var engineVersion by mutableStateOf<String?>(null)
+        private set
+
+    var updatingEngine by mutableStateOf(false)
+        private set
+
     private var probeJob: Job? = null
 
     private companion object {
@@ -114,6 +120,40 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissNotice() {
         notice = null
+    }
+
+    /** Read the engine version once, off the main thread; the first call unpacks Python. */
+    fun loadEngineVersion() {
+        if (engineVersion != null) return
+        viewModelScope.launch {
+            engineVersion = withContext(Dispatchers.IO) { ytDlp.versionOrInit() } ?: "unknown"
+        }
+    }
+
+    /**
+     * Update yt-dlp from its own release feed.
+     *
+     * This is the one thing that keeps a downloader honest over time: the sites change and the
+     * engine has to follow. [onDone] receives a message to show.
+     */
+    fun updateEngine(onDone: (String) -> Unit) {
+        if (updatingEngine) return
+        updatingEngine = true
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { ytDlp.updateEngine() }
+            }
+            updatingEngine = false
+            result.fold(
+                onSuccess = { version ->
+                    engineVersion = version ?: engineVersion
+                    onDone("Engine updated to ${version ?: "the latest version"}")
+                },
+                onFailure = { error ->
+                    onDone("Couldn't update: ${error.message ?: "no connection"}")
+                },
+            )
+        }
     }
 
     /** Import a browser cookies.txt. Returns null on success, or a message for the user. */

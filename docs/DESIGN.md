@@ -87,6 +87,22 @@ The launcher art is generated, not hand-drawn in a design tool: `icon/generate_i
 every density (legacy, round, adaptive background and foreground) from one function so the
 mark cannot drift between them.
 
+## 5a. The two bugs that only appeared in release
+
+**R8 against a reflective dependency.** youtubedl-android unpacks its Python payload with Apache
+Commons Compress, which registers extra-field handlers from a static list of class literals and
+instantiates them by name. Shrinking removed one of those classes, so the very first unzip threw
+`NoClassDefFoundError: ExtraFieldUtils`, the runtime never came up, and every download of every
+site failed. It survived testing because the one device that passed had a leftover unpacked
+Python from an earlier debug build — the debug path never exercises the same bytecode. The fix
+is a keep rule; the lesson is that a first-run path tested only on a dirty install is not tested.
+
+**Obfuscation against the person holding the phone.** With obfuscation on, the exception above
+reached the user as the string `i5.f`: a renamed class, no message, no way for anyone to act on
+it. The app is 97% native payload, so obfuscation saved almost nothing and cost the entire
+diagnosis. Release builds now keep their names, log every job to the `UUDL` tag, and print the
+throwing class when a message is missing.
+
 ## 6. Where the line is: accounts and regions
 
 Two things came up that the app deliberately does not do.
