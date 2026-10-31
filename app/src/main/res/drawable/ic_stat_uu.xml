@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Status-bar glyph. The system renders small icons as an alpha mask, so it is white on
+    transparent and carries no colour of its own.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:pathData="M12,3.2L12,14.1"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.1"
+        android:strokeLineCap="round" />
+
+    <path
+        android:pathData="M7.5,9.8L12,14.3L16.5,9.8"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.1"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <path
+        android:pathData="M4.7,16.4v2.5a1.5,1.5 0 0 0 1.5,1.5h11.6a1.5,1.5 0 0 0 1.5,-1.5v-2.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.1"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

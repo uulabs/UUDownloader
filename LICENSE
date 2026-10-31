@@ -1,0 +1,19 @@
+UU Downloader
+Copyright (C) 2026 UU Labs
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+GNU General Public License as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
+the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program. If
+not, see <https://www.gnu.org/licenses/>.
+
+Why GPL: the download engine is
+  io.github.junkfood02.youtubedl-android { library, ffmpeg } 0.18.1
+which is GPL-3.0 and bundles a CPython runtime, yt-dlp and ffmpeg. Linking it makes this
+application a covered work. yt-dlp itself is released under the Unlicense; the Python runtime,
+ffmpeg and the Android support libraries carry their own licences.
