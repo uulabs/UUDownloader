@@ -47,12 +47,38 @@ class CoreTest {
         assertEquals(Platform.FACEBOOK, SocialLinks.parse("https://fb.watch/x/")!!.platform)
         assertEquals(Platform.X, SocialLinks.parse("https://x.com/u/status/1")!!.platform)
         assertEquals(Platform.X, SocialLinks.parse("https://t.co/x")!!.platform)
+        assertEquals(Platform.REDDIT, SocialLinks.parse("https://www.reddit.com/r/a/comments/1/x/")!!.platform)
+        assertEquals(Platform.REDDIT, SocialLinks.parse("https://v.redd.it/abc123")!!.platform)
+        assertEquals(Platform.REDDIT, SocialLinks.parse("https://redd.it/abc123")!!.platform)
     }
 
     @Test
     fun `a host that merely ends in a known name is not that site`() {
         assertEquals(Platform.OTHER, SocialLinks.parse("https://notyoutube.com/x")!!.platform)
         assertEquals(Platform.OTHER, SocialLinks.parse("https://youtube.com.evil.example/x")!!.platform)
+    }
+
+    @Test
+    fun `an unnamed site is called by its own name, not by "Link"`() {
+        assertEquals(
+            "Pornhub",
+            SocialLinks.parse("https://www.pornhub.com/view_video.php?viewkey=abc")!!.siteName,
+        )
+        assertEquals(
+            "Xvideos",
+            SocialLinks.parse("https://www.xvideos.com/video123/some_title")!!.siteName,
+        )
+        assertEquals("Vimeo", SocialLinks.parse("https://vimeo.com/12345")!!.siteName)
+        assertEquals("Example", SocialLinks.siteNameOf("ew.example.co.uk"))
+        assertEquals("Spank Bang", SocialLinks.siteNameOf("spank-bang.com"))
+    }
+
+    @Test
+    fun `the five named platforms keep their own label`() {
+        assertEquals("YouTube", SocialLinks.parse("https://youtu.be/x")!!.siteName)
+        assertEquals("TikTok", SocialLinks.parse("https://www.tiktok.com/@a/video/1")!!.siteName)
+        assertEquals("X", SocialLinks.parse("https://x.com/a/status/1")!!.siteName)
+        assertEquals("Reddit", SocialLinks.parse("https://reddit.com/r/a/comments/1/x/")!!.siteName)
     }
 
     @Test
@@ -135,6 +161,16 @@ class CoreTest {
         val stderr = "WARNING: nonsense\nERROR: Video unavailable\nTraceback"
         assertEquals("Video unavailable", ProgressText.errorMessage(stderr))
         assertNull(ProgressText.errorMessage("nothing useful"))
+    }
+
+    @Test
+    fun `a login wall is explained rather than pasted at the user`() {
+        val raw = "[Reddit] 90bu6w: Account authentication is required. Use --cookies, " +
+            "--cookies-from-browser, --username and --password (reddit)"
+        val hint = ProgressText.hint(raw)
+        assertTrue(hint.contains("signed-in session"), hint)
+        assertTrue(!hint.contains("--cookies-from-browser"), hint)
+        assertEquals("That video is private.", ProgressText.hint("This video is private"))
     }
 
     // ---- direct links ------------------------------------------------------

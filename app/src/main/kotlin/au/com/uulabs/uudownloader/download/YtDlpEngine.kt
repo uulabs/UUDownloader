@@ -22,7 +22,11 @@ class CancelledDownload : Exception("cancelled")
  * folder the user chose is [FolderWriter]'s job, because that is where Android's storage rules
  * live.
  */
-class YtDlpEngine(private val context: Context) : VideoEngine {
+class YtDlpEngine(
+    private val context: Context,
+    /** cookies.txt for sites that will not answer an anonymous request; null when none. */
+    private val cookies: () -> File? = { null },
+) : VideoEngine {
 
     @Volatile
     private var ready = false
@@ -64,6 +68,7 @@ class YtDlpEngine(private val context: Context) : VideoEngine {
         request.addOption("--no-playlist")
         request.addOption("--no-warnings")
         request.addOption("--skip-download")
+        cookies()?.let { request.addOption("--cookies", it.absolutePath) }
         val json = YoutubeDL.execute(request, PROBE_PROCESS_ID).out
             .lineSequence()
             .map { it.trim() }
@@ -116,6 +121,7 @@ class YtDlpEngine(private val context: Context) : VideoEngine {
         // write or silently relocate it. yt-dlp is asked for something already tame.
         ytRequest.addOption("--restrict-filenames")
         ytRequest.addOption("-o", File(workDir, "%(title).90s.%(ext)s").absolutePath)
+        cookies()?.let { ytRequest.addOption("--cookies", it.absolutePath) }
 
         try {
             YoutubeDL.execute(ytRequest, processId) { percent, _eta, line ->

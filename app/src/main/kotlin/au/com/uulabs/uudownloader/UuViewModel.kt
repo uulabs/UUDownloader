@@ -9,6 +9,7 @@ import au.com.uulabs.uudownloader.core.Quality
 import au.com.uulabs.uudownloader.core.QualityChoice
 import au.com.uulabs.uudownloader.core.SocialLink
 import au.com.uulabs.uudownloader.core.SocialLinks
+import au.com.uulabs.uudownloader.data.CookieJar
 import au.com.uulabs.uudownloader.data.Destination
 import au.com.uulabs.uudownloader.data.UuPrefs
 import au.com.uulabs.uudownloader.download.DownloadHub
@@ -40,7 +41,8 @@ enum class ShareOutcome {
 class UuViewModel(app: Application) : AndroidViewModel(app) {
 
     private val prefs = UuPrefs(app)
-    private val ytDlp by lazy { YtDlpEngine(app) }
+    private val jar = CookieJar(app)
+    private val ytDlp by lazy { YtDlpEngine(app) { jar.path() } }
 
     val items: StateFlow<List<au.com.uulabs.uudownloader.download.DownloadItem>> = DownloadHub.items
 
@@ -65,11 +67,17 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
     var notice by mutableStateOf<String?>(null)
         private set
 
+    var cookiesAdded by mutableStateOf(jar.exists)
+        private set
+
+    var cookieCount by mutableStateOf(if (jar.exists) jar.cookieCount else 0)
+        private set
+
     private var probeJob: Job? = null
 
     private companion object {
         /** Long enough for a healthy network, short enough not to feel like a hang. */
-        const val PROBE_BUDGET_MS = 20_000L
+        const val PROBE_BUDGET_MS = 45_000L
     }
 
     fun onUrlChanged(value: String) {
@@ -108,6 +116,28 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
         notice = null
     }
 
+    /** Import a browser cookies.txt. Returns null on success, or a message for the user. */
+    fun importCookies(uri: Uri): String? {
+        val result = jar.import(uri)
+        return result.fold(
+            onSuccess = { count ->
+                cookiesAdded = true
+                cookieCount = count
+                notice = null
+                // A site that refused before may answer now, so ask again for the current link.
+                link?.let(::scheduleProbe)
+                null
+            },
+            onFailure = { error -> error.message ?: "That file could not be used" },
+        )
+    }
+
+    fun removeCookies() {
+        jar.clear()
+        cookiesAdded = false
+        cookieCount = 0
+    }
+
     fun availableQualities(): List<Quality> =
         if (checking) Quality.entries.toList() else QualityChoice.options(sourceInfo?.maxHeight)
 
@@ -121,6 +151,7 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
             platform = current.platform,
             quality = quality,
             title = sourceInfo?.title,
+            siteName = current.siteName,
         )
         DownloadService.start(getApplication())
         probeJob?.cancel()
@@ -184,7 +215,6 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Platform name for the chip under the field, e.g. "Instagram" or "Link". */
-    fun platformLabel(): String =
-        link?.platform?.label ?: Platform.OTHER.label
+    /** Site name for the chip under the field, e.g. "Instagram", "Pornhub" or "Vimeo". */
+    fun siteLabel(): String = link?.siteName ?: Platform.OTHER.label
 }

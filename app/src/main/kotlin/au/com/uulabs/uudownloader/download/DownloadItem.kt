@@ -26,6 +26,8 @@ data class DownloadItem(
     val platform: Platform,
     val quality: Quality,
     val state: DownloadState,
+    /** "Pornhub", "Vimeo", … when the site is not one of the five named platforms. */
+    val siteName: String? = null,
     val title: String? = null,
     /** 0f..1f, or null while the size is not known yet. */
     val progress: Float? = null,
@@ -36,6 +38,8 @@ data class DownloadItem(
     val error: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
 ) {
+    val siteLabel: String get() = siteName ?: platform.label
+
     val displayName: String
-        get() = savedName ?: title ?: "${platform.label} video"
+        get() = savedName ?: title ?: "$siteLabel video"
 }

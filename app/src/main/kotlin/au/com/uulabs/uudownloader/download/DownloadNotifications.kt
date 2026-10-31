@@ -37,7 +37,7 @@ object DownloadNotifications {
 
     fun ongoing(context: Context, item: DownloadItem): Notification {
         val percent = item.progress?.let { (it * 100).toInt().coerceIn(0, 100) }
-        val title = item.title?.take(60) ?: "${item.platform.label} video"
+        val title = item.title?.take(60) ?: "${item.siteLabel} video"
         val text = buildString {
             append(
                 when (item.state) {
@@ -74,7 +74,7 @@ object DownloadNotifications {
         }
         val text = when {
             done -> "Saved. Tap to open"
-            item.state == DownloadState.CANCELLED -> item.platform.label
+            item.state == DownloadState.CANCELLED -> item.siteLabel
             else -> item.error ?: "The site refused the download"
         }
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)

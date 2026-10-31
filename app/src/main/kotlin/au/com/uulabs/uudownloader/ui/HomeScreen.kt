@@ -325,7 +325,7 @@ private fun LinkField(vm: UuViewModel) {
     AnimatedVisibility(visible = status != null) {
         Row(Modifier.padding(top = 10.dp, start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             vm.link?.let { link ->
-                PlatformBadge(link.platform, size = 22)
+                SiteBadge(link.siteName, size = 22)
                 Spacer(Modifier.width(8.dp))
             }
             Text(
@@ -345,7 +345,7 @@ private fun statusLine(vm: UuViewModel): String? {
         return if (vm.urlText.isBlank()) null else "That doesn't look like a link"
     }
     val info = vm.sourceInfo
-    return info?.title ?: link.platform.label
+    return info?.title ?: link.siteName
 }
 
 @Composable
@@ -377,11 +377,11 @@ private fun ActiveCard(item: DownloadItem, onCancel: () -> Unit) {
     Panel(Modifier.fillMaxWidth(), border = Uu.Text.copy(alpha = 0.18f)) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                PlatformBadge(item.platform)
+                SiteBadge(item.siteLabel)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = item.title ?: "${item.platform.label} video",
+                        text = item.title ?: "${item.siteLabel} video",
                         style = MaterialTheme.typography.titleMedium,
                         fontSize = 14.5.sp,
                         color = Uu.Text,
@@ -439,7 +439,7 @@ private fun RecentRow(item: DownloadItem, onOpenFile: (String) -> Unit) {
             .padding(vertical = 9.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        PlatformBadge(item.platform, size = 30)
+        SiteBadge(item.siteLabel, size = 30)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -472,7 +472,7 @@ private fun subtitle(item: DownloadItem): String {
         DateUtils.MINUTE_IN_MILLIS,
     ).toString()
     return when (item.state) {
-        DownloadState.DONE -> "Saved · ${item.platform.label} · $when_"
+        DownloadState.DONE -> "Saved · ${item.siteLabel} · $when_"
         DownloadState.CANCELLED -> "Cancelled"
         else -> item.error ?: "Failed"
     }

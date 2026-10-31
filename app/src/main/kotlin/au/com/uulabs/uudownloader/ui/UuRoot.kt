@@ -67,6 +67,15 @@ fun UuRoot(vm: UuViewModel) {
         }.getOrNull()
     }
 
+    val cookiePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { picked ->
+            val problem = vm.importCookies(picked)
+            if (problem != null) {
+                Toast.makeText(context, problem, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     BackHandler(enabled = screen != Screen.HOME) { screen = Screen.HOME }
 
     Box(Modifier.fillMaxSize().background(Uu.Ink)) {
@@ -96,6 +105,7 @@ fun UuRoot(vm: UuViewModel) {
                         vm = vm,
                         onBack = { screen = Screen.HOME },
                         onChooseFolder = { folderPicker.launch(startFolder) },
+                        onPickCookies = { cookiePicker.launch("*/*") },
                         onOpenAbout = { screen = Screen.ABOUT },
                     )
 

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +44,7 @@ fun SettingsScreen(
     vm: UuViewModel,
     onBack: () -> Unit,
     onChooseFolder: () -> Unit,
+    onPickCookies: () -> Unit,
     onOpenAbout: () -> Unit,
 ) {
     Column(
@@ -128,7 +130,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(12.dp))
             MutedLine(
                 "Android won't let an app write into Download itself, so videos go in a folder " +
-                    "inside it. If you pick your own, pick a folder rather than the top of Download.",
+                    "inside it.",
                 color = Uu.Faint,
             )
 
@@ -158,6 +160,74 @@ fun SettingsScreen(
                     )
                 }
             }
+
+            Spacer(Modifier.height(26.dp))
+            Eyebrow("Sites that need an account")
+            Spacer(Modifier.height(10.dp))
+            Panel(Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Uu.Text.copy(alpha = 0.07f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Outlined.Lock,
+                            contentDescription = null,
+                            tint = Uu.Text.copy(alpha = 0.85f),
+                            modifier = Modifier.size(17.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(13.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = if (vm.cookiesAdded) "Browser cookies" else "Not signed in",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontSize = 14.5.sp,
+                            color = Uu.Text,
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        MutedLine(
+                            if (vm.cookiesAdded) {
+                                "${vm.cookieCount} cookies · Reddit, private posts and other gated sites"
+                            } else {
+                                "Reddit, private posts and other gated sites"
+                            },
+                            color = Uu.Faint,
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(9.dp))
+                            .border(1.dp, Uu.Hairline, RoundedCornerShape(9.dp))
+                            .clickable {
+                                if (vm.cookiesAdded) vm.removeCookies() else onPickCookies()
+                            }
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                    ) {
+                        Text(
+                            text = if (vm.cookiesAdded) "Remove" else "Add",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontSize = 13.sp,
+                            color = Uu.Text.copy(alpha = 0.8f),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            MutedLine(
+                "Export cookies.txt from a browser you're signed into, then pick it here. " +
+                    "It stays on this device.",
+                color = Uu.Faint,
+            )
 
             Spacer(Modifier.height(26.dp))
             Eyebrow("About")

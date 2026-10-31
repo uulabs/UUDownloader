@@ -87,7 +87,29 @@ The launcher art is generated, not hand-drawn in a design tool: `icon/generate_i
 every density (legacy, round, adaptive background and foreground) from one function so the
 mark cannot drift between them.
 
-## 6. What is deliberately absent
+## 6. Where the line is: accounts and regions
+
+Two things came up that the app deliberately does not do.
+
+**It does not defeat authentication.** Reddit's video API refuses anonymous clients, so the
+obvious "fix" is to mint the tokens a browser would mint — scrape the page, replay the signing
+dance, look like a logged-in client. That is circumventing an access control the operator put
+there on purpose, and it is both a terms-of-service problem and, in several jurisdictions, a
+legal one. What the app does instead: accept a `cookies.txt` the user exported from *their own*
+browser session, pass it to yt-dlp, and say plainly when a site wants a session. The user's own
+credentials are consent; forged ones are not.
+
+**It does not defeat geography.** Where a site blocks a country — including the age-assurance
+regimes some sites answer by refusing a whole region — the app reports the site's own error.
+A VPN on the phone is the phone's business and the app inherits it, because it has no network
+layer of its own: one `HttpURLConnection` per direct link, one yt-dlp child process otherwise,
+both on the system resolver. There is no proxy support, no fake locale, no header laundering,
+and adding a "bypass" mode to this app would be building a different, worse product.
+
+The honest position is also the useful one: everything that *is* publicly reachable works, and
+that is the overwhelming majority of what people share.
+
+## 7. What is deliberately absent
 
 - **No playback.** Saving is the job; opening the file is one tap away and the system owns it.
 - **No account, no server, no upload.** The only network traffic is the request to fetch the

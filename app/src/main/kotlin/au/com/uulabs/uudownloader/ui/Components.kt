@@ -1,15 +1,25 @@
 package au.com.uulabs.uudownloader.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -28,7 +38,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import au.com.uulabs.uudownloader.core.Platform
 
 /** The app's one card shape: a slightly lifted surface with a hairline edge. */
 @Composable
@@ -59,9 +68,9 @@ fun Eyebrow(text: String, modifier: Modifier = Modifier, color: Color = Uu.Faint
     )
 }
 
-/** A small round tile carrying the platform's first letter: one material, no colour coding. */
+/** A small round tile carrying the site's first letter: one material, no colour coding. */
 @Composable
-fun PlatformBadge(platform: Platform, size: Int = 34) {
+fun SiteBadge(label: String, size: Int = 34) {
     Box(
         Modifier
             .size(size.dp)
@@ -71,7 +80,7 @@ fun PlatformBadge(platform: Platform, size: Int = 34) {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = platform.label.take(1),
+            text = label.take(1),
             style = MaterialTheme.typography.labelLarge,
             fontSize = (size * 0.4f).sp,
             color = Uu.Text.copy(alpha = 0.82f),
@@ -152,7 +161,8 @@ fun QualityPills(
 fun ProgressLane(progress: Float?, modifier: Modifier = Modifier) {
     val target = (progress ?: 0f).coerceIn(0f, 1f)
     val animated by animateFloatAsState(targetValue = target, label = "progress")
-    Box(
+
+    BoxWithConstraints(
         modifier
             .fillMaxWidth()
             .height(4.dp)
@@ -160,21 +170,35 @@ fun ProgressLane(progress: Float?, modifier: Modifier = Modifier) {
             .background(Uu.Hairline)
     ) {
         if (progress == null) {
-            // Unknown total: a short bar riding the lane reads as "working", where a 0% bar
-            // reads as "stuck".
+            // Unknown total: a band travelling the lane reads as "working". A bar parked at a
+            // third of the way reads as "stuck", which is the opposite of what it means.
+            val lane = maxWidth
+            val transition = rememberInfiniteTransition(label = "lane")
+            val travel by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1500, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart,
+                ),
+                label = "travel",
+            )
             Box(
                 Modifier
-                    .fillMaxWidth(0.28f)
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(Brush.horizontalGradient(listOf(Color.Transparent, Uu.Text, Color.Transparent)))
+                    .width(lane * 0.32f)
+                    .fillMaxHeight()
+                    .offset(x = lane * (travel * 1.32f - 0.32f))
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(Color.Transparent, Uu.Text, Color.Transparent)
+                        )
+                    )
             )
         } else {
             Box(
                 Modifier
                     .fillMaxWidth(animated)
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp))
+                    .fillMaxHeight()
                     .background(Brush.horizontalGradient(listOf(Uu.AccentDim, Uu.Text)))
             )
         }

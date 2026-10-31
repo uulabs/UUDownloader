@@ -89,7 +89,7 @@ fun AboutScreen(onBack: () -> Unit) {
                     Eyebrow("Works with")
                     Spacer(Modifier.height(9.dp))
                     MutedLine(
-                        "YouTube · TikTok · Instagram · Facebook · X",
+                        "YouTube · TikTok · Instagram · Reddit · Facebook · X\nand most other video sites",
                         color = Uu.Text.copy(alpha = 0.8f),
                     )
                     Spacer(Modifier.height(14.dp))

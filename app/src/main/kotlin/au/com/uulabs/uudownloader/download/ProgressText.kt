@@ -35,6 +35,34 @@ object ProgressText {
         }
     }
 
+    /**
+     * What to tell the user, given what the site told us.
+     *
+     * The app never pretends a gated video succeeded, and it never tries to defeat a site's
+     * access control. When a site insists on a signed-in session, the honest answer is to say
+     * so and point at the one thing the user can do about it.
+     */
+    fun hint(raw: String?): String {
+        val text = raw.orEmpty()
+        return when {
+            text.contains("authentication is required", true) ||
+                text.contains("--cookies", true) ||
+                text.contains("logged-in", true) ||
+                text.contains("log in", true) ||
+                text.contains("login required", true) ||
+                text.contains("sign in to", true) ->
+                "This site wants a signed-in session. Add your browser cookies in Settings, or use a link anyone can open."
+            text.contains("not available in your country", true) ||
+                text.contains("geo restricted", true) ->
+                "The site won't serve this video in your region."
+            text.contains("private", true) ->
+                "That video is private."
+            text.contains("not found", true) || text.contains("removed", true) ->
+                "That video has been removed."
+            else -> text
+        }
+    }
+
     /** The most useful single sentence out of a yt-dlp error blob. */
     fun errorMessage(stderr: String?): String? {
         val line = stderr?.lineSequence()

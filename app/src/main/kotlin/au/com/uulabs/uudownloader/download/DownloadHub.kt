@@ -34,13 +34,20 @@ object DownloadHub {
 
     fun active(): DownloadItem? = _items.value.firstOrNull { it.state.isRunning }
 
-    fun enqueue(url: String, platform: Platform, quality: Quality, title: String? = null): DownloadItem {
+    fun enqueue(
+        url: String,
+        platform: Platform,
+        quality: Quality,
+        title: String? = null,
+        siteName: String? = null,
+    ): DownloadItem {
         val item = DownloadItem(
             id = UUID.randomUUID().toString(),
             url = url,
             platform = platform,
             quality = quality,
             state = DownloadState.QUEUED,
+            siteName = siteName,
             title = title,
         )
         _items.update { listOf(item) + it }

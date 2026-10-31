@@ -10,6 +10,7 @@ import au.com.uulabs.uudownloader.core.DirectLinks
 import au.com.uulabs.uudownloader.core.FileNames
 import au.com.uulabs.uudownloader.core.Platform
 import au.com.uulabs.uudownloader.core.Quality
+import au.com.uulabs.uudownloader.data.CookieJar
 import au.com.uulabs.uudownloader.data.Destination
 import au.com.uulabs.uudownloader.data.UuPrefs
 import java.io.File
@@ -115,8 +116,9 @@ class DownloadService : Service() {
         } catch (e: CancelledDownload) {
             DownloadHub.finish(item.id, DownloadState.CANCELLED) { it.copy(detail = null) }
         } catch (e: Throwable) {
+            val message = ProgressText.hint(e.message).ifBlank { "Something went wrong" }
             DownloadHub.finish(item.id, DownloadState.FAILED) {
-                it.copy(detail = null, error = e.message?.take(160) ?: "Something went wrong")
+                it.copy(detail = null, error = message.take(180))
             }
         } finally {
             workDir.deleteRecursively()
@@ -188,7 +190,8 @@ class DownloadService : Service() {
         if (DirectLinks.looksDirect(url)) direct else ytDlpEngine()
 
     private fun ytDlpEngine(): YtDlpEngine =
-        ytDlp ?: YtDlpEngine(applicationContext).also { ytDlp = it }
+        ytDlp ?: YtDlpEngine(applicationContext) { CookieJar(applicationContext).path() }
+            .also { ytDlp = it }
 
     /**
      * Larger than the internal cache: a 10-minute 1080p video is a few hundred megabytes, and

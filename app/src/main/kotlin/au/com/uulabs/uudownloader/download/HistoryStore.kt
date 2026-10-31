@@ -41,6 +41,7 @@ class HistoryStore(
         put("id", item.id)
         put("url", item.url)
         put("platform", item.platform.name)
+        put("siteName", item.siteName ?: JSONObject.NULL)
         put("quality", item.quality.name)
         put("state", item.state.name)
         put("title", item.title ?: JSONObject.NULL)
@@ -56,6 +57,7 @@ class HistoryStore(
         platform = Platform.valueOf(json.getString("platform")),
         quality = Quality.valueOf(json.getString("quality")),
         state = DownloadState.valueOf(json.getString("state")),
+        siteName = json.stringOrNull("siteName"),
         title = json.stringOrNull("title"),
         savedName = json.stringOrNull("savedName"),
         savedUri = json.stringOrNull("savedUri"),
