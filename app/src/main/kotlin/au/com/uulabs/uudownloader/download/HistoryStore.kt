@@ -35,7 +35,21 @@ class HistoryStore(
         write(array.toString())
     }
 
+    fun remove(id: String) {
+        val kept = load().filterNot { it.id == id }
+        if (kept.isEmpty()) {
+            write(null)
+            return
+        }
+        val array = JSONArray()
+        kept.forEach { array.put(toJson(it)) }
+        write(array.toString())
+    }
+
     fun clear() = write(null)
+
+    /** Everything this app has saved and still has a handle to. */
+    fun retainedBytes(): Long = load().sumOf { it.sizeBytes ?: 0L }
 
     private fun toJson(item: DownloadItem) = JSONObject().apply {
         put("id", item.id)
@@ -47,6 +61,7 @@ class HistoryStore(
         put("title", item.title ?: JSONObject.NULL)
         put("savedName", item.savedName ?: JSONObject.NULL)
         put("savedUri", item.savedUri ?: JSONObject.NULL)
+        put("sizeBytes", item.sizeBytes ?: JSONObject.NULL)
         put("error", item.error ?: JSONObject.NULL)
         put("note", item.note ?: JSONObject.NULL)
         put("createdAt", item.createdAt)
@@ -62,6 +77,7 @@ class HistoryStore(
         title = json.stringOrNull("title"),
         savedName = json.stringOrNull("savedName"),
         savedUri = json.stringOrNull("savedUri"),
+        sizeBytes = if (json.isNull("sizeBytes")) null else json.optLong("sizeBytes"),
         error = json.stringOrNull("error"),
         note = json.stringOrNull("note"),
         createdAt = json.optLong("createdAt", System.currentTimeMillis()),

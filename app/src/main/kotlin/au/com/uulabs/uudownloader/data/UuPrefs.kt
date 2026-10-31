@@ -45,6 +45,22 @@ class UuPrefs(context: Context) {
         }.getOrDefault(Quality.HIGH)
         set(value) = prefs.edit().putString(KEY_QUALITY, value.name).apply()
 
+    var storageLimit: StorageLimit
+        get() = StorageLimit(
+            mode = runCatching {
+                LimitMode.valueOf(prefs.getString(KEY_LIMIT_MODE, LimitMode.GIGABYTES.name)!!)
+            }.getOrDefault(LimitMode.GIGABYTES),
+            gigabytes = prefs.getInt(KEY_LIMIT_GB, StorageLimit.DEFAULT_GIGABYTES)
+                .coerceIn(StorageLimit.MIN_GIGABYTES, StorageLimit.MAX_GIGABYTES),
+            percent = prefs.getInt(KEY_LIMIT_PERCENT, StorageLimit.DEFAULT_PERCENT)
+                .coerceIn(StorageLimit.MIN_PERCENT, StorageLimit.MAX_PERCENT),
+        )
+        set(value) = prefs.edit()
+            .putString(KEY_LIMIT_MODE, value.mode.name)
+            .putInt(KEY_LIMIT_GB, value.gigabytes)
+            .putInt(KEY_LIMIT_PERCENT, value.percent)
+            .apply()
+
     /** Whether the one-time background engine update has already succeeded on this install. */
     var engineUpdated: Boolean
         get() = prefs.getBoolean(KEY_ENGINE_UPDATED, false)
@@ -62,5 +78,8 @@ class UuPrefs(context: Context) {
         const val KEY_QUALITY = "default_quality"
         const val KEY_HISTORY = "history"
         const val KEY_ENGINE_UPDATED = "engine_updated"
+        const val KEY_LIMIT_MODE = "limit_mode"
+        const val KEY_LIMIT_GB = "limit_gb"
+        const val KEY_LIMIT_PERCENT = "limit_percent"
     }
 }

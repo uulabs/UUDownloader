@@ -72,11 +72,18 @@ object DownloadHub {
         finished?.let { history?.record(it) }
     }
 
-    fun remove(id: String) {
+    /** Drop a finished row and forget it, without touching the file on disk. */
+    fun forget(id: String) {
         _items.update { list -> list.filterNot { it.id == id } }
+        history?.remove(id)
     }
 
-    fun clearFinished() {
+    /** Every finished row at once. A running job is left alone: it has no file yet. */
+    fun forgetFinished() {
         _items.update { list -> list.filter { it.state.isRunning } }
+        history?.clear()
     }
+
+    /** Bytes this app knows it has written into the user's folder. */
+    fun retainedBytes(): Long = history?.retainedBytes() ?: 0L
 }

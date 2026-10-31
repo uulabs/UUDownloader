@@ -35,6 +35,8 @@ data class DownloadItem(
     val detail: String? = null,
     val savedName: String? = null,
     val savedUri: String? = null,
+    /** Bytes written to the user's folder, once the file is finished. */
+    val sizeBytes: Long? = null,
     val error: String? = null,
     /** Something the user should know about the file that was saved, e.g. a quality fallback. */
     val note: String? = null,

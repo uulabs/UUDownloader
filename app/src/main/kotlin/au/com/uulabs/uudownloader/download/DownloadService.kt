@@ -12,7 +12,9 @@ import au.com.uulabs.uudownloader.core.FileNames
 import au.com.uulabs.uudownloader.core.Platform
 import au.com.uulabs.uudownloader.core.Quality
 import au.com.uulabs.uudownloader.data.CookieJar
+import au.com.uulabs.uudownloader.data.ByteSize
 import au.com.uulabs.uudownloader.data.Destination
+import au.com.uulabs.uudownloader.data.StorageLimit
 import au.com.uulabs.uudownloader.data.UuPrefs
 import java.io.File
 import java.util.Collections
@@ -42,6 +44,11 @@ class DownloadService : Service() {
     private val direct = DirectHttpEngine()
 
     private var lastNotifyAt = 0L
+    private var lastSizeCheckAt = 0L
+
+    /** Set when the storage allowance, not the user, stopped the job. */
+    @Volatile
+    private var budgetBreach: String? = null
     private var lastNotifiedPercent = -1
 
     override fun onCreate() {
@@ -102,11 +109,27 @@ class DownloadService : Service() {
         publishForeground(force = true)
 
         UuLog.i("job ${item.id}: start site=${item.siteLabel} quality=${item.quality} url=${item.url.take(80)}")
+
+        val limit = prefs?.storageLimit ?: StorageLimit.default()
+        val limitBytes = StorageLimit.limitBytes(this, limit)
+        val usedBefore = DownloadHub.retainedBytes()
+        budgetBreach = null
+
         try {
+            // Refuse before spending the user's data on something that cannot be kept.
+            if (limitBytes > 0 && usedBefore >= limitBytes) {
+                throw DownloadFailure(
+                    "Storage limit reached — ${ByteSize.human(usedBefore)} of " +
+                        "${ByteSize.human(limitBytes)}. Raise it in Settings or delete older downloads."
+                )
+            }
             val destination = prefs?.destination ?: Destination.Downloads
             val result = engineFor(item.url).download(
                 request = DownloadRequest(item.id, item.url, item.quality, workDir),
-                onProgress = { progress -> onProgress(item.id, progress) },
+                onProgress = { progress ->
+                    enforceBudget(item, workDir, usedBefore, limitBytes)
+                    onProgress(item.id, progress)
+                },
                 isCancelled = { cancelled.contains(item.id) },
             )
 
@@ -136,12 +159,21 @@ class DownloadService : Service() {
                     detail = null,
                     quality = result.quality,
                     note = result.note,
+                    sizeBytes = file.length(),
                 )
             }
-            UuLog.i("job ${item.id}: saved as ${saved.name}")
+            UuLog.i("job ${item.id}: saved as ${saved.name} (${file.length()} bytes)")
         } catch (e: CancelledDownload) {
-            UuLog.i("job ${item.id}: cancelled")
-            DownloadHub.finish(item.id, DownloadState.CANCELLED) { it.copy(detail = null) }
+            val breach = budgetBreach
+            if (breach != null) {
+                UuLog.w("job ${item.id}: stopped at the storage limit")
+                DownloadHub.finish(item.id, DownloadState.FAILED) {
+                    it.copy(detail = null, error = breach.take(180))
+                }
+            } else {
+                UuLog.i("job ${item.id}: cancelled")
+                DownloadHub.finish(item.id, DownloadState.CANCELLED) { it.copy(detail = null) }
+            }
         } catch (e: Throwable) {
             UuLog.e("job ${item.id}: failed", e)
             // A message-less throwable used to render as the word "wrong"; the class name is
@@ -153,8 +185,37 @@ class DownloadService : Service() {
         } finally {
             workDir.deleteRecursively()
             cancelled.remove(item.id)
+            budgetBreach = null
             showResult(item.id)
         }
+    }
+
+    /**
+     * Stop a job that is about to pass the storage allowance.
+     *
+     * The scratch file is measured rather than the reported size, because yt-dlp's estimate is
+     * for one stream and the merged file is the sum. Killing the process is the only way to
+     * stop it promptly; the job then lands in FAILED with the reason, not silently in CANCELLED.
+     */
+    private fun enforceBudget(
+        item: DownloadItem,
+        workDir: File,
+        usedBefore: Long,
+        limitBytes: Long,
+    ) {
+        if (limitBytes <= 0) return
+        val now = System.currentTimeMillis()
+        if (now - lastSizeCheckAt < SIZE_CHECK_INTERVAL_MS) return
+        lastSizeCheckAt = now
+
+        val inFlight = workDir.listFiles()?.sumOf { it.length() } ?: 0L
+        if (usedBefore + inFlight <= limitBytes) return
+
+        budgetBreach = "Storage limit reached — stopped at ${ByteSize.human(limitBytes)}. " +
+            "Raise the limit in Settings or delete older downloads."
+        UuLog.w("job ${item.id}: over the storage limit, cancelling")
+        cancelled.add(item.id)
+        engineFor(item.url).cancel(item.id)
     }
 
     private fun onProgress(id: String, progress: Progress) {
@@ -237,6 +298,8 @@ class DownloadService : Service() {
         const val ACTION_START = "au.com.uulabs.uudownloader.action.START"
         const val ACTION_CANCEL = "au.com.uulabs.uudownloader.action.CANCEL"
         const val EXTRA_ID = "id"
+
+        private const val SIZE_CHECK_INTERVAL_MS = 1_500L
 
         /** Bring the service up. The caller has already put work in [DownloadHub]. */
         fun start(context: Context) {

@@ -8,7 +8,9 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,6 +58,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import au.com.uulabs.uudownloader.data.ByteSize
 import androidx.compose.ui.unit.sp
 import au.com.uulabs.uudownloader.UuViewModel
 import au.com.uulabs.uudownloader.core.Quality
@@ -73,6 +76,8 @@ fun HomeScreen(
     val running = items.firstOrNull { it.state.isRunning }
     val finished = items.filter { it.state.isTerminal }
     var detailOf by remember { mutableStateOf<DownloadItem?>(null) }
+    var rowAction by remember { mutableStateOf<DownloadItem?>(null) }
+    var confirmClear by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
 
     Column(
@@ -128,12 +133,12 @@ fun HomeScreen(
                 Spacer(Modifier.weight(1f))
                 if (finished.isNotEmpty()) {
                     Text(
-                        text = "Clear",
+                        text = "Clear all",
                         style = MaterialTheme.typography.bodySmall,
                         color = Uu.Faint,
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable { vm.clearFinished() }
+                            .clickable { confirmClear = true }
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                     )
                 }
@@ -149,12 +154,95 @@ fun HomeScreen(
                             item = item,
                             onOpenFile = onOpenFile,
                             onShowDetail = { detailOf = item },
+                            onLongPress = { rowAction = item },
                         )
                     }
                 }
             }
             Spacer(Modifier.height(40.dp))
         }
+    }
+
+    // Long press: forget this one, with the file or without it.
+    rowAction?.let { item ->
+        val hasFile = item.savedUri != null
+        AlertDialog(
+            onDismissRequest = { rowAction = null },
+            title = { Text("Remove this download?", style = MaterialTheme.typography.titleMedium) },
+            text = {
+                Column {
+                    Text(
+                        text = item.displayName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Uu.Text,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (hasFile) {
+                        Spacer(Modifier.height(8.dp))
+                        MutedLine(
+                            "${ByteSize.human(item.sizeBytes ?: 0L)} in your folder · the file stays unless you delete it",
+                            color = Uu.Faint,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Row {
+                    if (hasFile) {
+                        DialogAction("Delete file") {
+                            vm.forget(item, deleteFile = true)
+                            rowAction = null
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    DialogAction("Remove") {
+                        vm.forget(item, deleteFile = false)
+                        rowAction = null
+                    }
+                }
+            },
+            dismissButton = {
+                DialogAction("Cancel", muted = true) { rowAction = null }
+            },
+            containerColor = Uu.Surface,
+            textContentColor = Uu.Muted,
+            titleContentColor = Uu.Text,
+        )
+    }
+
+    // Clear all: says plainly that deleting is the destructive option.
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text("Clear all downloads?", style = MaterialTheme.typography.titleMedium) },
+            text = {
+                MutedLine(
+                    "This empties the list. Deleting files also removes every video this app saved to " +
+                        "${vm.destination.label} — that cannot be undone.",
+                    color = Uu.Muted,
+                )
+            },
+            confirmButton = {
+                Row {
+                    DialogAction("Delete files too") {
+                        vm.forgetAll(deleteFiles = true)
+                        confirmClear = false
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    DialogAction("Remove from list") {
+                        vm.forgetAll(deleteFiles = false)
+                        confirmClear = false
+                    }
+                }
+            },
+            dismissButton = {
+                DialogAction("Cancel", muted = true) { confirmClear = false }
+            },
+            containerColor = Uu.Surface,
+            textContentColor = Uu.Muted,
+            titleContentColor = Uu.Text,
+        )
     }
 
     detailOf?.let { item ->
@@ -474,11 +562,13 @@ private fun ActiveCard(item: DownloadItem, onCancel: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun RecentRow(
     item: DownloadItem,
     onOpenFile: (String) -> Unit,
     onShowDetail: () -> Unit,
+    onLongPress: () -> Unit,
 ) {
     val done = item.state == DownloadState.DONE
     val failed = item.state == DownloadState.FAILED
@@ -486,15 +576,16 @@ private fun RecentRow(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .then(
-                when {
-                    done && item.savedUri != null -> Modifier.clickable { item.savedUri?.let(onOpenFile) }
-                    // A two-line row cannot show a yt-dlp error. Tapping it opens the whole
-                    // message with a copy button, so it can be pasted into a bug report
-                    // instead of being photographed.
-                    failed -> Modifier.clickable(onClick = onShowDetail)
-                    else -> Modifier
-                }
+            // Long press is the way to get rid of a row; tap keeps its own meaning (open the
+            // video, or read the error).
+            .combinedClickable(
+                onClick = {
+                    when {
+                        done && item.savedUri != null -> item.savedUri?.let(onOpenFile)
+                        failed -> onShowDetail()
+                    }
+                },
+                onLongClick = onLongPress,
             )
             .padding(vertical = 9.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -538,6 +629,24 @@ private fun subtitle(item: DownloadItem): String {
         }
         DownloadState.CANCELLED -> "Cancelled"
         else -> item.error ?: "Failed"
+    }
+}
+
+@Composable
+private fun DialogAction(label: String, muted: Boolean = false, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(9.dp))
+            .border(1.dp, if (muted) Color.Transparent else Uu.Hairline, RoundedCornerShape(9.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontSize = 13.5.sp,
+            color = if (muted) Uu.Muted else Uu.Text,
+        )
     }
 }
 

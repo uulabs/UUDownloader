@@ -5,6 +5,9 @@ import au.com.uulabs.uudownloader.core.FileNames
 import au.com.uulabs.uudownloader.core.Platform
 import au.com.uulabs.uudownloader.core.Quality
 import au.com.uulabs.uudownloader.core.QualityChoice
+import au.com.uulabs.uudownloader.data.ByteSize
+import au.com.uulabs.uudownloader.data.LimitMode
+import au.com.uulabs.uudownloader.data.StorageLimit
 import au.com.uulabs.uudownloader.core.SocialLinks
 import au.com.uulabs.uudownloader.download.ProgressText
 import kotlin.test.Test
@@ -180,6 +183,26 @@ class CoreTest {
         assertTrue(hint.contains("signed-in session"), hint)
         assertTrue(!hint.contains("--cookies-from-browser"), hint)
         assertEquals("That video is private.", ProgressText.hint("This video is private"))
+    }
+
+    // ---- storage allowance -------------------------------------------------
+
+    @Test
+    fun `a gigabyte limit is a number of bytes and a percent is a share of the phone`() {
+        val gb = StorageLimit(LimitMode.GIGABYTES, gigabytes = 5, percent = 10)
+        assertEquals(5_000_000_000L, gb.bytes(totalInternalBytes = 128_000_000_000L))
+
+        val percent = StorageLimit(LimitMode.PERCENT, gigabytes = 5, percent = 10)
+        assertEquals(12_800_000_000L, percent.bytes(totalInternalBytes = 128_000_000_000L))
+        // The percentage must not depend on free space, only on the device's capacity.
+        assertEquals(12_800_000_000L, percent.bytes(totalInternalBytes = 128_000_000_000L))
+    }
+
+    @Test
+    fun `sizes read the way a person says them`() {
+        assertEquals("476 KB", ByteSize.human(476_000))
+        assertEquals("12 MB", ByteSize.human(12_400_000))
+        assertEquals("5.0 GB", ByteSize.human(5_000_000_000))
     }
 
     // ---- direct links ------------------------------------------------------

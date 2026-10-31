@@ -38,7 +38,12 @@ import au.com.uulabs.uudownloader.BuildConfig
 import au.com.uulabs.uudownloader.R
 import au.com.uulabs.uudownloader.UuViewModel
 import au.com.uulabs.uudownloader.core.Quality
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import au.com.uulabs.uudownloader.data.ByteSize
 import au.com.uulabs.uudownloader.data.Destination
+import au.com.uulabs.uudownloader.data.LimitMode
+import au.com.uulabs.uudownloader.data.StorageLimit
 
 @Composable
 fun SettingsScreen(
@@ -135,6 +140,11 @@ fun SettingsScreen(
                     "inside it.",
                 color = Uu.Faint,
             )
+
+            Spacer(Modifier.height(26.dp))
+            Eyebrow("Storage")
+            Spacer(Modifier.height(10.dp))
+            StoragePanel(vm)
 
             Spacer(Modifier.height(26.dp))
             Eyebrow("Default quality")
@@ -305,6 +315,142 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(36.dp))
         }
+    }
+}
+
+/**
+ * How much room the app may take, as a number or as a share of the phone.
+ *
+ * A phone's storage is the one resource a downloader can exhaust without the user noticing,
+ * so the allowance is set here, enforced before a download starts, and shown as a bar rather
+ * than a sentence.
+ */
+@Composable
+private fun StoragePanel(vm: UuViewModel) {
+    val limit = vm.storageLimit
+    val limitBytes = StorageLimit.limitBytes(LocalContext.current, limit)
+    val used = vm.usageBytes
+    val fraction = if (limitBytes > 0) (used.toFloat() / limitBytes).coerceIn(0f, 1f) else 0f
+    val value = when (limit.mode) {
+        LimitMode.GIGABYTES -> limit.gigabytes
+        LimitMode.PERCENT -> limit.percent
+    }
+    val range = when (limit.mode) {
+        LimitMode.GIGABYTES -> StorageLimit.MIN_GIGABYTES.toFloat()..50f
+        LimitMode.PERCENT -> 1f..90f
+    }
+
+    Panel(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Allowed",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 14.5.sp,
+                    color = Uu.Text,
+                )
+                Spacer(Modifier.weight(1f))
+                MutedLine(
+                    "${ByteSize.human(used)} of ${ByteSize.human(limitBytes)}",
+                    color = if (fraction > 0.9f) Uu.Danger else Uu.Muted,
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            ProgressLane(fraction)
+            Spacer(Modifier.height(16.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LimitMode.entries.forEach { mode ->
+                    val selected = mode == limit.mode
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (selected) Uu.Text.copy(alpha = 0.10f) else Color.Transparent)
+                            .border(
+                                1.dp,
+                                if (selected) Uu.Text.copy(alpha = 0.30f) else Uu.Hairline,
+                                RoundedCornerShape(10.dp),
+                            )
+                            .clickable {
+                                vm.updateStorageLimit(
+                                    when (mode) {
+                                        LimitMode.GIGABYTES -> limit.copy(mode = mode)
+                                        LimitMode.PERCENT -> limit.copy(mode = mode)
+                                    }
+                                )
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = when (mode) {
+                                LimitMode.GIGABYTES -> "Gigabytes"
+                                LimitMode.PERCENT -> "Percent"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            fontSize = 13.sp,
+                            color = if (selected) Uu.Text else Uu.Muted,
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            // A stepper rather than a slider: a limit is a number people say out loud
+            // ("five gigs"), and a slider with 49 stops draws a ruler.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StepButton("−", enabled = value > range.start.toInt()) {
+                    vm.updateStorageLimit(
+                        when (limit.mode) {
+                            LimitMode.GIGABYTES -> limit.copy(gigabytes = value - 1)
+                            LimitMode.PERCENT -> limit.copy(percent = value - 1)
+                        }
+                    )
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = when (limit.mode) {
+                            LimitMode.GIGABYTES -> "$value GB"
+                            LimitMode.PERCENT -> "$value%"
+                        },
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontSize = 20.sp,
+                        color = Uu.Text,
+                    )
+                }
+                StepButton("+", enabled = value < range.endInclusive.toInt()) {
+                    vm.updateStorageLimit(
+                        when (limit.mode) {
+                            LimitMode.GIGABYTES -> limit.copy(gigabytes = value + 1)
+                            LimitMode.PERCENT -> limit.copy(percent = value + 1)
+                        }
+                    )
+                }
+            }
+
+            MutedLine("Downloads stop when this is reached.", color = Uu.Faint)
+        }
+    }
+}
+
+@Composable
+private fun StepButton(symbol: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .border(1.dp, if (enabled) Uu.Hairline else Uu.Hairline.copy(alpha = 0.4f), CircleShape)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = symbol,
+            style = MaterialTheme.typography.headlineSmall,
+            fontSize = 20.sp,
+            color = if (enabled) Uu.Text else Uu.Faint,
+        )
     }
 }
 

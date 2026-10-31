@@ -103,7 +103,10 @@ fun UuRoot(vm: UuViewModel) {
                     )
 
                     Screen.SETTINGS -> {
-                        LaunchedEffect(Unit) { vm.loadEngineVersion() }
+                        LaunchedEffect(Unit) {
+                            vm.loadEngineVersion()
+                            vm.refreshUsage()
+                        }
                         SettingsScreen(
                         vm = vm,
                         onBack = { screen = Screen.HOME },

@@ -34,6 +34,16 @@ object MimeTypes {
  * write into a folder the user picked on modern Android. A filesystem path would work on
  * exactly one device that happens to have the same layout, and nowhere else.
  */
+/** Removing a video the user asked to be rid of, wherever it was written. */
+object SavedFileRemover {
+    fun delete(context: Context, uri: String?): Boolean {
+        if (uri.isNullOrBlank()) return true
+        return runCatching {
+            context.contentResolver.delete(Uri.parse(uri), null, null) >= 0
+        }.getOrDefault(false)
+    }
+}
+
 object FolderWriter {
 
     fun save(

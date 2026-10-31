@@ -11,9 +11,12 @@ import au.com.uulabs.uudownloader.core.SocialLink
 import au.com.uulabs.uudownloader.core.SocialLinks
 import au.com.uulabs.uudownloader.data.CookieJar
 import au.com.uulabs.uudownloader.data.Destination
+import au.com.uulabs.uudownloader.data.StorageLimit
 import au.com.uulabs.uudownloader.data.UuPrefs
 import au.com.uulabs.uudownloader.download.DownloadHub
+import au.com.uulabs.uudownloader.download.DownloadItem
 import au.com.uulabs.uudownloader.download.DownloadService
+import au.com.uulabs.uudownloader.download.SavedFileRemover
 import au.com.uulabs.uudownloader.download.SourceInfo
 import au.com.uulabs.uudownloader.download.YtDlpEngine
 import kotlinx.coroutines.Dispatchers
@@ -208,7 +211,38 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
         DownloadService.cancel(getApplication(), id)
     }
 
-    fun clearFinished() = DownloadHub.clearFinished()
+    var storageLimit by mutableStateOf(prefs.storageLimit)
+        private set
+
+    var usageBytes by mutableStateOf(DownloadHub.retainedBytes())
+        private set
+
+    fun updateStorageLimit(limit: StorageLimit) {
+        prefs.storageLimit = limit
+        storageLimit = limit
+    }
+
+    fun refreshUsage() {
+        usageBytes = DownloadHub.retainedBytes()
+    }
+
+    /** Forget one finished download, optionally deleting the file it left behind. */
+    fun forget(item: DownloadItem, deleteFile: Boolean) {
+        if (deleteFile) SavedFileRemover.delete(getApplication(), item.savedUri)
+        DownloadHub.forget(item.id)
+        refreshUsage()
+    }
+
+    /** Forget everything finished. A running job is left alone; it has no file yet. */
+    fun forgetAll(deleteFiles: Boolean) {
+        if (deleteFiles) {
+            DownloadHub.items.value
+                .filter { it.state.isTerminal }
+                .forEach { SavedFileRemover.delete(getApplication(), it.savedUri) }
+        }
+        DownloadHub.forgetFinished()
+        refreshUsage()
+    }
 
     /**
      * A link arrives from the share sheet. With a folder already configured the app starts the
