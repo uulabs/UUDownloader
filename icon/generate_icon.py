@@ -12,6 +12,7 @@ Run from the repository root:
 """
 from __future__ import annotations
 
+import math
 import pathlib
 
 from PIL import Image, ImageDraw, ImageFilter
@@ -62,39 +63,65 @@ def soft_radial(centre: tuple[float, float], radius: float, peak: int = 255) -> 
 
 def glyph_mask(scale: float = 1.0, offset_y: float = 0.0) -> Image.Image:
     """
-    The mark: a U whose bowl comes to a point, which makes it read as a down arrow too.
+    The mark is the UU: two Us in one weight of stroke, white on black.
 
-    The first version was an arrow dropping into a tray — the same picture every downloader
-    uses. This one carries the initial instead: one stroke, no tray, no art, and it still says
-    "down" because the bottom is a point rather than a curve.
+    Two earlier attempts missed in opposite directions — an arrow dropping into a tray, which
+    is every downloader's icon, and then a single U with a pointed bowl, which is no one's.
+    UU Chat's mark is the letter pair; the family is the letterform, not a pictogram of the
+    verb. So this is the monogram, drawn clean, with nothing added to explain it.
+
+    Each letter is one filled polygon — outer contour down and around, inner contour back up —
+    so the bowl and the uprights are the same solid shape. Drawing them as separate pieces left
+    a horizontal seam where the round bottom met the stems.
     """
     mask = Image.new("L", (S, S), 0)
     draw = ImageDraw.Draw(mask)
 
-    cx = 512.0
-    cy = 512.0 + offset_y
+    centre_y = S / 2 + offset_y * SS
+    stroke = 104 * SS * scale
+    half = 118 * SS * scale
+    gap = 46 * SS * scale
+    top = centre_y - 205 * SS * scale
+    bowl = centre_y + 62 * SS * scale
 
-    def x(v: float) -> float:
-        return scaled(cx + v * scale)
-
-    def y(v: float) -> float:
-        return scaled(cy + v * scale)
-
-    stroke = int(round(scaled(112 * scale)))
-    half = 177.0
-    draw.line(
-        [(x(-half), y(-244)), (x(-half), y(22)), (x(0), y(236)), (x(half), y(22)), (x(half), y(-244))],
-        fill=255,
-        width=stroke,
-        joint="curve",
+    width_u = (half * 2) + stroke
+    total = (width_u * 2) + gap
+    centres = (
+        S / 2 - (total / 2) + width_u / 2,
+        S / 2 + (total / 2) - width_u / 2,
     )
-    # Square-ish ends, softened just enough not to look cut off at 48dp.
-    for end_x, end_y in ((-half, -244), (half, -244)):
+
+    outer_radius = half + stroke / 2
+    inner_radius = half - stroke / 2
+
+    for centre in centres:
+        outline = [(centre - outer_radius, top), (centre - outer_radius, bowl)]
+        for step in range(0, 181, 4):
+            angle = math.radians(180 - step)
+            outline.append((
+                centre + outer_radius * math.cos(angle),
+                bowl + outer_radius * math.sin(angle),
+            ))
+        outline.append((centre + outer_radius, top))
+        outline.append((centre + inner_radius, top))
+        outline.append((centre + inner_radius, bowl))
+        for step in range(0, 181, 4):
+            angle = math.radians(step)
+            outline.append((
+                centre + inner_radius * math.cos(angle),
+                bowl + inner_radius * math.sin(angle),
+            ))
+        outline.append((centre - inner_radius, top))
+        draw.polygon(outline, fill=255)
+
+        # Rounded tops, drawn over the flat ends.
         radius = stroke / 2
-        draw.ellipse(
-            [x(end_x) - radius, y(end_y) - radius, x(end_x) + radius, y(end_y) + radius],
-            fill=255,
-        )
+        for arm in (-half, half):
+            draw.ellipse(
+                [centre + arm - radius, top - radius, centre + arm + radius, top + radius],
+                fill=255,
+            )
+
     return mask
 
 
