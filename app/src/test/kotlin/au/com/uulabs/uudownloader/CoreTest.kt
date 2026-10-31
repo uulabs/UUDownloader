@@ -107,13 +107,22 @@ class CoreTest {
 
     @Test
     fun `selectors always end in something that can actually be saved`() {
-        assertTrue(QualityChoice.selector(Quality.NORMAL).contains("height<=720"))
-        assertTrue(QualityChoice.selector(Quality.HIGH).contains("height<=2160"))
+        assertTrue(QualityChoice.selector(Quality.NORMAL, canMerge = true).contains("height<=720"))
+        assertTrue(QualityChoice.selector(Quality.HIGH, canMerge = true).contains("height<=2160"))
         // Every selector has a plain "best" fallback, so a source with no matching streams
         // still produces a file instead of an error.
         for (quality in Quality.entries) {
-            assertTrue(QualityChoice.selector(quality).endsWith("/b"))
+            for (merge in listOf(true, false)) {
+                assertTrue(QualityChoice.selector(quality, merge).endsWith("/b"))
+            }
         }
+    }
+
+    @Test
+    fun `a build without ffmpeg never asks yt-dlp to merge`() {
+        // +ba means "also fetch the audio stream and join it", which needs ffmpeg.
+        assertTrue(!QualityChoice.selector(Quality.HIGH, canMerge = false).contains("+ba"))
+        assertTrue(QualityChoice.selector(Quality.HIGH, canMerge = true).contains("+ba"))
     }
 
     // ---- filenames ---------------------------------------------------------

@@ -2,6 +2,7 @@ package au.com.uulabs.uudownloader.download
 
 import android.content.Context
 import au.com.uulabs.uudownloader.core.QualityChoice
+import au.com.uulabs.uudownloader.BuildConfig
 import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
@@ -31,6 +32,10 @@ class YtDlpEngine(
     @Volatile
     private var ready = false
 
+    /** Whether this build carries ffmpeg, and whether it initialised. Both must be true. */
+    @Volatile
+    private var canMerge = false
+
     private val initLock = Any()
 
     /**
@@ -43,7 +48,11 @@ class YtDlpEngine(
         synchronized(initLock) {
             if (ready) return
             YoutubeDL.init(context)
-            runCatching { FFmpeg.init(context) }
+            canMerge = if (BuildConfig.UU_FFMPEG) {
+                runCatching { FFmpeg.init(context) }.isSuccess
+            } else {
+                false
+            }
             ready = true
         }
     }
@@ -112,8 +121,9 @@ class YtDlpEngine(
         val processId = processIdFor(request.jobId)
 
         val ytRequest = YoutubeDLRequest(request.url)
-        ytRequest.addOption("-f", QualityChoice.selector(request.quality))
-        ytRequest.addOption("--merge-output-format", "mp4")
+        val merge = canMerge
+        ytRequest.addOption("-f", QualityChoice.selector(request.quality, merge))
+        if (merge) ytRequest.addOption("--merge-output-format", "mp4")
         ytRequest.addOption("--no-playlist")
         ytRequest.addOption("--newline")
         ytRequest.addOption("--no-mtime")

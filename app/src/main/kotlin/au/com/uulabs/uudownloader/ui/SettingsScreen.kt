@@ -23,7 +23,6 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,7 +33,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
 import au.com.uulabs.uudownloader.BuildConfig
+import au.com.uulabs.uudownloader.R
 import au.com.uulabs.uudownloader.UuViewModel
 import au.com.uulabs.uudownloader.core.Quality
 import au.com.uulabs.uudownloader.data.Destination
@@ -83,7 +84,7 @@ fun SettingsScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            Icons.Rounded.FolderOpen,
+                            painterResource(R.drawable.ic_folder_open),
                             contentDescription = null,
                             tint = Uu.Text.copy(alpha = 0.85f),
                             modifier = Modifier.size(18.dp),

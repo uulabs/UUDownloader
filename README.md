@@ -55,14 +55,32 @@ Those are the site's rules to set, and the request either passes them honestly o
 Requires JDK 17+ and an Android SDK with platform 36. Nothing else.
 
 ```sh
-./gradlew :app:assembleDebug
-# app/build/outputs/apk/debug/app-debug.apk
+./gradlew :app:assembleRelease
+# app/build/outputs/apk/release/app-arm64-v8a-release.apk     (~57 MB)
+# app/build/outputs/apk/release/app-armeabi-v7a-release.apk   (~50 MB)
+# app/build/outputs/apk/release/app-universal-release.apk     (~100 MB)
 ```
 
-Install it with `adb install -r app/build/outputs/apk/debug/app-debug.apk`.
+Install the one that matches the phone — `adb install -r app/build/outputs/apk/release/app-arm64-v8a-release.apk`
+for anything made in the last decade — or the universal APK if you would rather not think about
+it. Release builds are signed with the debug key: this app is sideloaded, not published.
 
-The APK is large (~115 MB) because it carries, for both ARM ABIs, a Python runtime, yt-dlp and
-ffmpeg — see the note below.
+### Size
+
+| what | per ABI | why it is there |
+| --- | --- | --- |
+| ffmpeg | ~31–36 MB | joins a video stream to its audio stream; without it YouTube HQ is not possible |
+| CPython | ~13 MB | the runtime yt-dlp executes on |
+| yt-dlp + extractors | ~3 MB | the extractors themselves |
+| app + Compose | ~3 MB | everything you actually see, after shrinking |
+
+That is the honest cost of doing YouTube properly on a phone. Two things keep it down:
+
+- **Per-ABI APKs.** A phone only needs one architecture, so it only downloads one.
+- **A no-ffmpeg build:** `./gradlew :app:assembleRelease -PuuFfmpeg=false` produces roughly
+  **40 MB per ABI**. The app then asks for a single already-muxed file, which is what TikTok,
+  Instagram, Facebook, X, Reddit and the adult sites serve anyway — YouTube just tops out at its
+  best pre-muxed stream, usually 720p.
 
 ### Tests
 

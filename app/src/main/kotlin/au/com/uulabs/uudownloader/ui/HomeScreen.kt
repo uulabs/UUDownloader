@@ -29,10 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.ContentPaste
-import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +46,8 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.painterResource
+import au.com.uulabs.uudownloader.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -208,7 +207,7 @@ private fun DestinationCard(vm: UuViewModel, onChooseFolder: () -> Unit) {
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Rounded.FolderOpen,
+                    painterResource(R.drawable.ic_folder_open),
                     contentDescription = null,
                     tint = Uu.Text.copy(alpha = 0.85f),
                     modifier = Modifier.size(17.dp),
@@ -264,7 +263,7 @@ private fun LinkField(vm: UuViewModel) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                Icons.Outlined.Link,
+                painterResource(R.drawable.ic_link),
                 contentDescription = null,
                 tint = if (focused) Uu.Text else Uu.Faint,
                 modifier = Modifier.size(18.dp),
@@ -311,7 +310,7 @@ private fun LinkField(vm: UuViewModel) {
                     clipboard.getText()?.text?.let(vm::onUrlChanged)
                 }) {
                     Icon(
-                        Icons.Outlined.ContentPaste,
+                        painterResource(R.drawable.ic_paste),
                         contentDescription = "Paste",
                         tint = Uu.Muted,
                         modifier = Modifier.size(18.dp),

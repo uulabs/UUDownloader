@@ -30,14 +30,20 @@ object QualityChoice {
     /**
      * yt-dlp format selector for a quality.
      *
-     * Both selectors end in a plain "best" fallback: a muxed file at a lower resolution is a
-     * better outcome than a 1440p video with no sound, and it is what the user meant by
-     * "download this".
+     * Every selector ends in a plain "best" fallback: a muxed file at a lower resolution is a
+     * better outcome than an error, and it is what the user meant by "download this".
+     *
+     * [canMerge] is false in a build without ffmpeg. yt-dlp cannot join a video stream to an
+     * audio one on its own, and asking it to try produces a hard failure rather than a
+     * fallback, so the selector has to ask for a single already-muxed file instead. That caps
+     * YouTube at its best pre-muxed stream (usually 720p) and costs the other sites nothing,
+     * because they serve one file anyway.
      */
-    fun selector(quality: Quality): String = when (quality) {
-        Quality.NORMAL ->
+    fun selector(quality: Quality, canMerge: Boolean): String = when {
+        !canMerge && quality == Quality.HIGH -> "b[ext=mp4]/b"
+        !canMerge -> "b[height<=$NORMAL_MAX_HEIGHT][ext=mp4]/b[height<=$NORMAL_MAX_HEIGHT]/b[ext=mp4]/b"
+        quality == Quality.NORMAL ->
             "b[height<=$NORMAL_MAX_HEIGHT][ext=mp4]/b[height<=$NORMAL_MAX_HEIGHT]/b[ext=mp4]/b"
-        Quality.HIGH ->
-            "bv*[height<=2160]+ba/b[height<=2160]/b"
+        else -> "bv*[height<=2160]+ba/b[height<=2160]/b"
     }
 }
