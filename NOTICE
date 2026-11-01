@@ -1,0 +1,12 @@
+UU Downloader
+Copyright (C) 2026 UU Labs
+
+This program is free software, licensed under the GNU General Public License, version 3 or (at
+your option) any later version. The full text is in LICENSE.
+
+Why GPL: the download engine, youtubedl-android, is GPL-3.0 and carries a GPL build of FFmpeg, so
+the app as a whole is a covered work.
+
+Everything else the app ships, and its licence, is listed in
+app/src/main/assets/licenses/THIRD-PARTY-NOTICES.txt, which the app shows under
+Settings > About > Licences and notices.

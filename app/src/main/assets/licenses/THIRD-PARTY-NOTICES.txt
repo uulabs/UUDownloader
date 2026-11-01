@@ -1,0 +1,74 @@
+UU Downloader
+Copyright (C) 2026 UU Labs
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+GNU General Public License as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+General Public License, which follows these notices, for more details.
+
+Source code for this app: https://github.com/uulabs/UUDownloader
+Each release is built from the commit carrying its version tag.
+
+
+THIRD-PARTY SOFTWARE IN THIS APP
+
+youtubedl-android 0.18.1 (library and ffmpeg modules)
+  GNU General Public License v3.0
+  https://github.com/yausername/youtubedl-android
+  https://github.com/JunkFood02/youtubedl-android
+  Linking this is why the app as a whole is GPL-3.0. It carries the native programs below.
+
+yt-dlp and yt-dlp-ejs
+  The Unlicense
+  https://github.com/yt-dlp/yt-dlp
+  https://github.com/yt-dlp/ejs
+
+FFmpeg 7.1 (libav* 61, built with --enable-gpl --enable-version3)
+  GNU General Public License v3.0 or later
+  https://ffmpeg.org/download.html
+
+CPython 3.12
+  Python Software Foundation License Version 2
+  https://www.python.org/downloads/
+
+QuickJS
+  MIT License
+  https://bellard.org/quickjs/
+
+Libraries packaged with FFmpeg and CPython
+  These native programs were built by the Termux project and arrive with the libraries they
+  link, including AOM, dav1d, FreeType, Fontconfig, FriBidi, GnuTLS, HarfBuzz, libass, LAME,
+  Opus, Vorbis, OpenSSL, SQLite, libffi, bzip2 and XZ Utils. Each keeps its own licence, and
+  those packages and their build recipes are published at
+  https://github.com/termux/termux-packages
+
+Android Jetpack (AndroidX), including Jetpack Compose
+  Apache License 2.0
+  https://developer.android.com/jetpack/androidx
+
+Kotlin standard library and kotlinx.coroutines
+  Apache License 2.0
+  https://github.com/JetBrains/kotlin
+  https://github.com/Kotlin/kotlinx.coroutines
+
+Apache Commons Compress, Commons IO and Commons Lang
+  Apache License 2.0
+  https://commons.apache.org/
+
+Jackson
+  Apache License 2.0
+  https://github.com/FasterXML/jackson
+
+Guava and JSpecify
+  Apache License 2.0
+  https://github.com/google/guava
+  https://github.com/jspecify/jspecify
+
+The Apache License 2.0 is at https://www.apache.org/licenses/LICENSE-2.0. The notice files those
+libraries ship are kept inside the APK, in its META-INF folder.
+
+
+THE GNU GENERAL PUBLIC LICENSE, VERSION 3
