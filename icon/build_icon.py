@@ -46,11 +46,21 @@ def load_source() -> Image.Image:
 
 
 def tile_colour(art: Image.Image) -> tuple[int, int, int]:
-    """The most common opaque colour is the tile, and the adaptive background should match it."""
-    arr = np.asarray(art)
-    opaque = arr[arr[:, :, 3] > 250][:, :3]
-    values, counts = np.unique(opaque, axis=0, return_counts=True)
-    return tuple(int(v) for v in values[counts.argmax()])
+    """
+    The tile's own colour, for the adaptive background.
+
+    Median of the pixels below the mark, not the most common exact colour: this art is subtly
+    textured, so its tile is spread over hundreds of near-identical values while the letters
+    sit in a few uniform bright ones — and "most common" picked white.
+    """
+    arr = np.asarray(art).astype(float)
+    rgb, alpha = arr[:, :, :3], arr[:, :, 3]
+    luminance = rgb.mean(axis=2)
+    body = (alpha > 250) & (luminance < 32)
+    if body.sum() == 0:
+        return (6, 6, 8)
+    median = np.median(rgb[body], axis=0)
+    return tuple(int(v) for v in median.round())
 
 
 def extract_mark(art: Image.Image) -> Image.Image:
@@ -76,6 +86,33 @@ def extract_mark(art: Image.Image) -> Image.Image:
     if box is None:
         raise SystemExit("the supplied art has no mark above the tile")
     return mark.crop(box)
+
+
+def lift_charcoal(art: Image.Image, strength: float = 0.55) -> Image.Image:
+    """
+    Lifts the arrow and tray out of the black.
+
+    The approved art draws them at luminance ~58 on a ~7 tile. That reads as texture at
+    1024 and disappears entirely at 48dp, where the icon actually lives. This raises the
+    charcoal toward ~105 while leaving the letters at white and the tile at black, so the
+    download mark is legible at launcher size without changing the drawing.
+
+    The lift is stronger for darker pixels, so the arrow brightens more than the letters and
+    the two stay distinct.
+    """
+    arr = np.asarray(art).astype(float)
+    rgb = arr[:, :, :3]
+    alpha = arr[:, :, 3] / 255.0
+    luminance = rgb.mean(axis=2)
+
+    mark = ((luminance > 32) & (alpha > 0.1)).astype(float)
+    factor = 1.0 + strength * 0.9 * (1.0 - luminance / 255.0)
+    lifted = np.clip(rgb * factor[:, :, None], 0, 255)
+
+    out = arr.copy()
+    blend = mark[:, :, None]
+    out[:, :, :3] = rgb * (1 - blend) + lifted * blend
+    return Image.fromarray(out.round().astype(np.uint8), "RGBA")
 
 
 def centre_on(layer_px: int, content: Image.Image, share: float) -> Image.Image:
@@ -104,7 +141,7 @@ def write(image: Image.Image, path: pathlib.Path, size: int, circle: bool = Fals
 
 
 def main() -> None:
-    art = load_source()
+    art = lift_charcoal(load_source())
     mark = extract_mark(art)
     background_colour = tile_colour(art)
     rounded = art.resize((1024, 1024), Image.LANCZOS)
