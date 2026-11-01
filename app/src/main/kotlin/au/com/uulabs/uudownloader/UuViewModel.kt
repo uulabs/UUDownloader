@@ -21,6 +21,7 @@ import au.com.uulabs.uudownloader.download.DownloadState
 import au.com.uulabs.uudownloader.download.EngineUpdate
 import au.com.uulabs.uudownloader.download.SavedFiles
 import au.com.uulabs.uudownloader.update.AppUpdater
+import au.com.uulabs.uudownloader.update.SelfUpdate
 import au.com.uulabs.uudownloader.update.ReleaseInfo
 import au.com.uulabs.uudownloader.download.SourceInfo
 import au.com.uulabs.uudownloader.download.YtDlpEngine
@@ -41,7 +42,7 @@ sealed interface UpdatePrompt {
 }
 
 /** What the updates row is doing right now. */
-enum class UpdateBusy { NONE, CHECKING }
+enum class UpdateBusy { NONE, CHECKING, DOWNLOADING }
 
 /** What happened to a link that arrived from the share sheet. */
 enum class ShareOutcome {
@@ -102,6 +103,13 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
     /** One line of plain feedback for the updates row. */
     var updateNote by mutableStateOf<String?>(null)
         private set
+
+    /** Progress of a self-update download; only ever non-null in the autoupdate build. */
+    var updateProgress by mutableStateOf<Float?>(null)
+        private set
+
+    /** Whether this build installs its own updates. Set per build type. */
+    val selfUpdating: Boolean get() = BuildConfig.UU_SELF_UPDATE
 
     /** Set when a launch check finds something newer than what is installed. */
     var updatePrompt by mutableStateOf<UpdatePrompt?>(null)
@@ -243,14 +251,61 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Send the user to the release page for the new build.
+     * Act on an available app update.
      *
-     * The app deliberately does not download or install it: an APK dropper is what Play Protect
-     * flags, and no signing key changes that. The browser and Android's installer do this part.
+     * The standard builds open the release page: an APK dropper is what Play Protect flags, and
+     * the browser plus Android's installer do that job without making this app one. The
+     * `autoupdate` build installs in place instead, which is exactly why it is a separate APK
+     * and why it carries a warning in the interface.
      */
     fun openAppDownload() {
-        AppUpdater.openReleasePage(getApplication())
-        updateNote = "Opened the release page in your browser"
+        if (!BuildConfig.UU_SELF_UPDATE) {
+            AppUpdater.openReleasePage(getApplication())
+            updateNote = "Opened the release page in your browser"
+            return
+        }
+
+        val info = appUpdate ?: return
+        if (updateBusy != UpdateBusy.NONE) return
+
+        if (!SelfUpdate.canInstall(getApplication())) {
+            updateNote = "Allow UU Downloader to install apps, then try again"
+            SelfUpdate.openInstallPermission(getApplication())
+            return
+        }
+
+        val asset = SelfUpdate.pickAsset(info.assets)
+        if (asset == null) {
+            updateNote = "This release has no APK attached"
+            return
+        }
+
+        updateBusy = UpdateBusy.DOWNLOADING
+        updateProgress = 0f
+        updateNote = null
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { SelfUpdate.download(getApplication(), asset) { p -> updateProgress = p } }
+            }
+            updateBusy = UpdateBusy.NONE
+            updateProgress = null
+            result.fold(
+                onSuccess = { file ->
+                    if (!SelfUpdate.signedLikeInstalled(getApplication())) {
+                        // A different key cannot install over this one; Android would only say
+                        // "App not installed".
+                        appUpdate = null
+                        updateNote = "This build is signed with a new key. Uninstall UU Downloader, " +
+                            "then install the new version by hand"
+                        AppUpdater.openReleasePage(getApplication())
+                        return@fold
+                    }
+                    val opened = runCatching { SelfUpdate.install(getApplication(), file) }
+                    if (opened.isFailure) updateNote = "Couldn't open the installer"
+                },
+                onFailure = { updateNote = it.message ?: "Download failed" },
+            )
+        }
     }
 
     /** Read the engine version once, off the main thread; the first call unpacks Python. */

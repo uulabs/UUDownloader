@@ -6,20 +6,27 @@ import java.net.HttpURLConnection
 import java.net.URL
 import org.json.JSONObject
 
+/** One file attached to a release. */
+data class ReleaseAsset(
+    val name: String,
+    val url: String,
+    val sizeBytes: Long,
+)
+
 /** A version published on GitHub that this install does not have. */
 data class ReleaseInfo(
     val version: String,
     val notes: String?,
+    val assets: List<ReleaseAsset>,
 )
 
 /**
- * Tells the user when there is a newer build. It does not fetch one.
+ * Tells the user when there is a newer build.
  *
- * An app that downloads an APK and hands it to the system installer is, structurally, the same
- * thing malware does. Google Play Protect treats it that way, and it flagged every build of this
- * app that did it — including the one signed with a proper key. So the check stays and the
- * installer goes: the app opens the release page, the browser downloads the file, and Android's
- * own installer takes over. One extra tap, and the app is no longer a dropper.
+ * The app does not fetch or install APKs by default. An app that does is, structurally, the same
+ * thing malware does; Google Play Protect says so on install, and every build of this app that
+ * did it was flagged. The standard builds therefore only *report* an update and open the release
+ * page — see [SelfUpdate] for the opt-in build that does install itself.
  */
 object AppUpdater {
 
@@ -33,9 +40,23 @@ object AppUpdater {
         val tag = json.optString("tag_name").removePrefix("v").removePrefix("V")
         if (tag.isBlank()) return@runCatching null
         if (!isNewer(tag, currentVersion)) return@runCatching null
+
+        val assets = (json.optJSONArray("assets") ?: return@runCatching null)
+        val apks = (0 until assets.length())
+            .mapNotNull { assets.optJSONObject(it) }
+            .filter { it.optString("name").endsWith(".apk", ignoreCase = true) }
+            .map {
+                ReleaseAsset(
+                    name = it.optString("name"),
+                    url = it.optString("browser_download_url"),
+                    sizeBytes = it.optLong("size", 0L),
+                )
+            }
+
         ReleaseInfo(
             version = tag,
             notes = json.optString("body").takeIf { it.isNotBlank() }?.take(600),
+            assets = apks,
         )
     }
 
@@ -45,16 +66,16 @@ object AppUpdater {
         json.optString("tag_name").trim().takeIf { it.isNotEmpty() }
     }
 
-    /** Where the user gets the new APK. The app itself never handles an APK. */
+    /** Where the user gets the new APK. The standard builds never handle an APK themselves. */
     fun openReleasePage(context: Context) {
         val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(RELEASES_PAGE))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { context.startActivity(intent) }
     }
 
-    private fun githubJson(url: String): JSONObject = JSONObject(httpGet(url))
+    internal fun githubJson(url: String): JSONObject = JSONObject(httpGet(url))
 
-    private fun httpGet(url: String): String {
+    internal fun httpGet(url: String): String {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 15_000
             readTimeout = 15_000
@@ -72,12 +93,15 @@ object AppUpdater {
     }
 
     /**
-     * "1.2.0" is newer than "1.1.9". A v prefix and a suffix are ignored, so "1.5.0-2" and
-     * "1.5.0" are the same release. A version that is not numbers is never newer.
+     * "1.2.0" is newer than "1.1.9"; a leading v and any suffix after a dash are ignored.
+     *
+     * A version with a part that is not a number is not treated as newer: "1.x.9" is not a
+     * version this app can reason about, and answering "yes, newer" for it would offer an
+     * update that does not exist.
      */
     fun isNewer(candidate: String, current: String): Boolean {
-        val a = numbers(candidate) ?: return false
-        val b = numbers(current) ?: return false
+        val a = numericParts(candidate) ?: return false
+        val b = numericParts(current) ?: return false
         for (index in 0 until maxOf(a.size, b.size)) {
             val left = a.getOrElse(index) { 0 }
             val right = b.getOrElse(index) { 0 }
@@ -86,8 +110,8 @@ object AppUpdater {
         return false
     }
 
-    private fun numbers(version: String): List<Int>? {
-        val parts = version.trim().removePrefix("v").removePrefix("V").substringBefore('-').split('.')
-        return parts.map { it.toIntOrNull() ?: return null }
-    }
+    private fun numericParts(version: String): List<Int>? =
+        version.removePrefix("v").removePrefix("V").substringBefore('-').split('.').map {
+            it.toIntOrNull() ?: return null
+        }
 }

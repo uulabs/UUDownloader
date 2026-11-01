@@ -53,6 +53,14 @@ agent, because CDNs commonly refuse an unfamiliar one.
 | `UUDownloader-<version>-arm64.apk` | every phone from roughly 2017 onwards |
 | `UUDownloader-<version>-armv7.apk` | older 32-bit devices |
 | `UUDownloader-<version>-universal.apk` | both architectures in one file |
+| `UUDownloader-<version>-universal-autoupdate.apk` | the same app, able to install its own updates — see the warning below |
+
+> **⚠️ The `-universal-autoupdate` build will be reported by Google Play Protect.**
+> It downloads an APK and hands it to the installer, which is the behaviour Play Protect
+> classifies as a harmful app, and the report is accurate about that behaviour. In exchange it
+> updates in one tap instead of opening a browser page. If you would rather not see the warning,
+> install the universal or architecture-specific build: those only open the release page, and
+> Play Protect has nothing to object to.
 
 ```sh
 adb install -r UUDownloader-1.6.1-arm64.apk
@@ -75,8 +83,10 @@ release, and the same check runs on launch, at most once an hour. When a newer v
 the app offers it and opens the release page; the browser downloads the file and Android's
 installer takes over.
 
-The app does not download or install APKs itself. That behaviour is what Google Play Protect
-classifies as a dropper, and removing it is what keeps the app out of that category.
+The standard builds do not download or install APKs. That behaviour is what Google Play Protect
+classifies as a dropper, and leaving it out is what keeps those builds out of that category. The
+`-universal-autoupdate` build is the exception: it installs in place, carries a warning in
+Settings, and is expected to be reported.
 
 **Settings → Download engine → Update** fetches the current yt-dlp from its own release feed.
 This is independent of app updates and is the first thing to try when a site stops working. The

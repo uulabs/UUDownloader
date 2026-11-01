@@ -76,11 +76,16 @@ android {
         // works without asking for any storage permission at all.
         minSdk 29
         targetSdk 36
-        versionCode 21
-        versionName "1.6.2"
+        versionCode 22
+        versionName "1.6.3"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
+        // The certificate this app is expected to be signed with, so the autoupdate build can
+        // tell an install signed by an older key from one it can replace in place.
+        buildConfigField "String", "UU_CERT_SHA256",
+            "\"c712981a5a325fe742a1d3afbd20b6f4a63ab05e1a7e83ba0d0098703915b29a\""
+        buildConfigField "boolean", "UU_SELF_UPDATE", "false"
         buildConfigField "String", "UU_COMMIT", "\"${uuCommit}${uuDirty ? "-dirty" : ""}\""
         buildConfigField "boolean", "UU_FFMPEG", "${uuFfmpeg}"
         // Both test handsets are ARM (a 32-bit Blade A3 Plus and a 64-bit arm64 device).
@@ -136,6 +141,19 @@ android {
             shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
             // Assigning a config with no key would fail the build rather than leave it unsigned.
+            if (rootProject.file("SigningKeys/keystore.properties").exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
+
+        // The alternative build: identical app, plus the ability to download and install its own
+        // update. Google Play Protect classifies that behaviour as a dropper and says so on
+        // install, which is why it is a separate APK rather than the default. Its manifest adds
+        // REQUEST_INSTALL_PACKAGES and the update FileProvider; the release build has neither.
+        autoupdate {
+            initWith release
+            versionNameSuffix "-autoupdate"
+            buildConfigField "boolean", "UU_SELF_UPDATE", "true"
             if (rootProject.file("SigningKeys/keystore.properties").exists()) {
                 signingConfig signingConfigs.release
             }

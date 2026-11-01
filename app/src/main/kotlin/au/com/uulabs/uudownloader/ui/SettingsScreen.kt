@@ -236,6 +236,8 @@ fun SettingsScreen(
                         )
                         Spacer(Modifier.height(3.dp))
                         val status = when {
+                            vm.updateBusy == UpdateBusy.DOWNLOADING ->
+                                "Downloading ${((vm.updateProgress ?: 0f) * 100).toInt()}%"
                             vm.updateBusy == UpdateBusy.CHECKING -> "Checking GitHub…"
                             vm.appUpdate != null -> "${vm.appUpdate?.version} is available"
                             else -> vm.updateNote ?: "Checked against GitHub releases"
@@ -260,12 +262,38 @@ fun SettingsScreen(
                         Text(
                             text = when {
                                 vm.updateBusy != UpdateBusy.NONE -> "Working"
-                                installable -> "Get it"
+                                installable -> if (vm.selfUpdating) "Update" else "Get it"
                                 else -> "Check"
                             },
                             style = MaterialTheme.typography.labelLarge,
                             fontSize = 13.sp,
                             color = if (vm.updateBusy == UpdateBusy.NONE) Uu.Text.copy(alpha = 0.85f) else Uu.Faint,
+                        )
+                    }
+                }
+            }
+
+            if (vm.selfUpdating) {
+                Spacer(Modifier.height(10.dp))
+                Panel(
+                    Modifier.fillMaxWidth(),
+                    border = Uu.Danger.copy(alpha = 0.55f),
+                    background = Uu.Danger.copy(alpha = 0.08f),
+                ) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text(
+                            text = "This build updates itself",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontSize = 13.5.sp,
+                            color = Uu.Danger,
+                        )
+                        Spacer(Modifier.height(5.dp))
+                        MutedLine(
+                            "Downloading and installing an APK is what Play Protect reports as a " +
+                                "harmful app, and that report is correct about the behaviour. If you " +
+                                "would rather not see it, use the universal or architecture-specific " +
+                                "build instead — those only open the release page.",
+                            color = Uu.Text.copy(alpha = 0.75f),
                         )
                     }
                 }
