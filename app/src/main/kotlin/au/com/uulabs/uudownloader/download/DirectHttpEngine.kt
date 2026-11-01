@@ -7,12 +7,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * For a link that is already the file: a CDN mp4, an X video URL resolved elsewhere, a webm
- * someone pasted. No Python, no site logic, no waiting for a runtime to unpack.
+ * For a link that is already the file: a CDN mp4, a webm someone pasted. No Python, no site logic,
+ * no waiting for a runtime to unpack.
  *
- * This exists because yt-dlp takes several seconds to start and a direct link deserves none of
- * it. It is deliberately dumb: if the server answers with a page instead of bytes, the caller's
- * content-type check has already routed the job to yt-dlp instead.
+ * It only ever saves media. If the server answers with a page, it throws [NotADirectFile] before
+ * writing anything and the caller hands the job to yt-dlp, which knows what to do with a page.
  */
 class DirectHttpEngine : VideoEngine {
 
@@ -24,6 +23,7 @@ class DirectHttpEngine : VideoEngine {
         onProgress: (Progress) -> Unit,
         isCancelled: () -> Boolean,
     ): DownloadResult {
+        if (isCancelled()) throw CancelledDownload()
         val workDir = request.workDir
         if (!workDir.exists() && !workDir.mkdirs()) {
             throw DownloadFailure("Could not prepare a scratch folder")
@@ -46,12 +46,14 @@ class DirectHttpEngine : VideoEngine {
             var copied = 0L
             var lastReport = 0L
             connection.inputStream.use { input ->
+                val buffer = ByteArray(64 * 1024)
+                var read = input.read(buffer)
+                if (read < 0) throw DownloadFailure("The server sent no data")
+                if (DirectLinks.looksLikePage(connection.contentType, buffer, read)) throw NotADirectFile()
+
                 target.outputStream().use { output ->
-                    val buffer = ByteArray(64 * 1024)
-                    while (true) {
+                    while (read >= 0) {
                         if (isCancelled()) throw CancelledDownload()
-                        val read = input.read(buffer)
-                        if (read < 0) break
                         output.write(buffer, 0, read)
                         copied += read
                         val now = System.currentTimeMillis()
@@ -64,10 +66,14 @@ class DirectHttpEngine : VideoEngine {
                                 )
                             )
                         }
+                        read = input.read(buffer)
                     }
                 }
             }
             if (copied == 0L) throw DownloadFailure("The server sent no data")
+            if (total > 0 && copied != total) {
+                throw DownloadFailure("The connection ended early: ${megabytes(copied)} of ${megabytes(total)}")
+            }
             onProgress(Progress(percent = 1f, line = null))
             return DownloadResult(target, request.quality)
         } finally {
@@ -79,6 +85,7 @@ class DirectHttpEngine : VideoEngine {
         String.format("%.1f MB", bytes / 1_000_000.0)
 
     private companion object {
+        // CDNs commonly refuse an unfamiliar user agent, so this one reads as a phone's browser.
         const val USER_AGENT =
             "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) " +
                 "Chrome/122.0 Mobile Safari/537.36"

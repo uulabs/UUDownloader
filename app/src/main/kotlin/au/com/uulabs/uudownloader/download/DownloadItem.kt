@@ -38,6 +38,8 @@ data class DownloadItem(
     /** Bytes written to the user's folder, once the file is finished. */
     val sizeBytes: Long? = null,
     val error: String? = null,
+    /** Everything the engine said about a failure, for the "What went wrong" dialog. */
+    val errorDetail: String? = null,
     /** Something the user should know about the file that was saved, e.g. a quality fallback. */
     val note: String? = null,
     val createdAt: Long = System.currentTimeMillis(),

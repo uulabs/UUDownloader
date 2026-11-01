@@ -21,11 +21,15 @@ object DownloadHub {
     val items: StateFlow<List<DownloadItem>> = _items.asStateFlow()
 
     private var history: HistoryStore? = null
+    private var ledger: SavedLedger? = null
 
-    fun attach(store: HistoryStore) {
+    fun attach(store: HistoryStore, saved: SavedLedger) {
         history = store
+        ledger = saved
+        val kept = store.load()
+        saved.seedIfNew(kept)
         if (_items.value.isEmpty()) {
-            _items.value = store.load().sortedByDescending { it.createdAt }
+            _items.value = kept.sortedByDescending { it.createdAt }
         }
     }
 
@@ -69,21 +73,42 @@ object DownloadHub {
                 else transform(it).copy(state = state).also { done -> finished = done }
             }
         }
-        finished?.let { history?.record(it) }
+        finished?.let { done ->
+            history?.record(done)
+            val uri = done.savedUri
+            if (done.state == DownloadState.DONE && uri != null) {
+                ledger?.add(SavedEntry(done.id, uri, done.sizeBytes ?: 0L))
+            }
+        }
     }
 
-    /** Drop a finished row and forget it, without touching the file on disk. */
+    /** Drop a finished row and stop answering for its file, without touching the file on disk. */
     fun forget(id: String) {
         _items.update { list -> list.filterNot { it.id == id } }
         history?.remove(id)
+        ledger?.remove(id)
     }
 
-    /** Every finished row at once. A running job is left alone: it has no file yet. */
-    fun forgetFinished() {
-        _items.update { list -> list.filter { it.state.isRunning } }
-        history?.clear()
+    /**
+     * Every finished row at once, except those in [keep]. A running job is left alone: it has no
+     * file yet. Files the list no longer shows are let go of as well.
+     */
+    fun forgetFinished(keep: Set<String> = emptySet()) {
+        _items.update { list -> list.filter { it.state.isRunning || it.id in keep } }
+        if (keep.isEmpty()) history?.clear() else history?.let { store ->
+            store.load().filterNot { it.id in keep }.forEach { store.remove(it.id) }
+        }
+        ledger?.retain { it.id in keep }
+    }
+
+    /** Every file this app still answers for, including those too old to have a row. */
+    fun savedEntries(): List<SavedEntry> = ledger?.entries().orEmpty()
+
+    /** Drop whatever the user has since deleted some other way. Touches the disk. */
+    fun reconcile(stillThere: (SavedEntry) -> Boolean) {
+        ledger?.retain(stillThere)
     }
 
     /** Bytes this app knows it has written into the user's folder. */
-    fun retainedBytes(): Long = history?.retainedBytes() ?: 0L
+    fun retainedBytes(): Long = ledger?.totalBytes() ?: 0L
 }

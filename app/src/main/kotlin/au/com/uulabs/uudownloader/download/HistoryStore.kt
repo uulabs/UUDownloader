@@ -27,6 +27,7 @@ class HistoryStore(
         }.getOrDefault(emptyList())
     }
 
+    @Synchronized
     fun record(item: DownloadItem) {
         if (!item.state.isTerminal) return
         val kept = (listOf(item) + load().filter { it.id != item.id }).take(limit)
@@ -35,6 +36,7 @@ class HistoryStore(
         write(array.toString())
     }
 
+    @Synchronized
     fun remove(id: String) {
         val kept = load().filterNot { it.id == id }
         if (kept.isEmpty()) {
@@ -46,10 +48,8 @@ class HistoryStore(
         write(array.toString())
     }
 
+    @Synchronized
     fun clear() = write(null)
-
-    /** Everything this app has saved and still has a handle to. */
-    fun retainedBytes(): Long = load().sumOf { it.sizeBytes ?: 0L }
 
     private fun toJson(item: DownloadItem) = JSONObject().apply {
         put("id", item.id)
@@ -63,6 +63,7 @@ class HistoryStore(
         put("savedUri", item.savedUri ?: JSONObject.NULL)
         put("sizeBytes", item.sizeBytes ?: JSONObject.NULL)
         put("error", item.error ?: JSONObject.NULL)
+        put("errorDetail", item.errorDetail?.take(MAX_DETAIL_CHARS) ?: JSONObject.NULL)
         put("note", item.note ?: JSONObject.NULL)
         put("createdAt", item.createdAt)
     }
@@ -79,10 +80,15 @@ class HistoryStore(
         savedUri = json.stringOrNull("savedUri"),
         sizeBytes = if (json.isNull("sizeBytes")) null else json.optLong("sizeBytes"),
         error = json.stringOrNull("error"),
+        errorDetail = json.stringOrNull("errorDetail"),
         note = json.stringOrNull("note"),
         createdAt = json.optLong("createdAt", System.currentTimeMillis()),
     )
 
     private fun JSONObject.stringOrNull(key: String): String? =
         if (isNull(key)) null else optString(key).takeIf { it.isNotEmpty() }
+
+    private companion object {
+        const val MAX_DETAIL_CHARS = 4_000
+    }
 }

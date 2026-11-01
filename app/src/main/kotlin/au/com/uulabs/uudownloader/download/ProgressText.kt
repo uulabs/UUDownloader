@@ -35,12 +35,27 @@ object ProgressText {
         }
     }
 
+    private val LOGIN = Regex("""\blog[ -]?in\b|\blogged[ -]in\b|\bsign in to\b""", RegexOption.IGNORE_CASE)
+    private val PRIVATE = Regex(
+        """\bprivate (video|post|account)\b|\b(video|post|account)\b[^.]{0,30}\bprivate\b""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val REMOVED = Regex(
+        """has been removed|has been deleted|no longer available|http error 404|\b(video|post) not found\b""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val NETWORK = Regex(
+        """name or service not known|name resolution|no address associated|network is unreachable|""" +
+            """timed out|connection reset|connection refused""",
+        RegexOption.IGNORE_CASE,
+    )
+
     /**
      * What to tell the user, given what the site told us.
      *
-     * The app never pretends a gated video succeeded, and it never tries to defeat a site's
-     * access control. When a site insists on a signed-in session, the honest answer is to say
-     * so and point at the one thing the user can do about it.
+     * Each answer has to be earned by the site's own words. Saying "removed" because an error
+     * contained "not found" would blame the video for a missing tool or a dead connection, so
+     * anything not recognised is shown as it is.
      */
     fun hint(raw: String?): String {
         val text = raw.orEmpty()
@@ -49,25 +64,22 @@ object ProgressText {
                 "YouTube refused this network. The app will have already tried other clients — " +
                     "update the download engine in Settings, or add your browser cookies if it still refuses."
             text.contains("confirm you're not a bot", true) ||
-                text.contains("confirm you’re not a bot", true) ||
+                text.contains("confirm you\u2019re not a bot", true) ||
                 text.contains("sign in to confirm", true) ->
                 "YouTube is asking this network to sign in. Update the download engine in Settings, " +
                     "or add your browser cookies if it still refuses."
             text.contains("requires authentication", true) ||
                 text.contains("authentication is required", true) ||
                 text.contains("--cookies", true) ||
-                text.contains("logged-in", true) ||
-                text.contains("log in", true) ||
-                text.contains("login required", true) ||
-                text.contains("sign in to", true) ->
+                LOGIN.containsMatchIn(text) ->
                 "This site wants a signed-in session. Add your browser cookies in Settings, or use a link anyone can open."
             text.contains("not available in your country", true) ||
-                text.contains("geo restricted", true) ->
+                text.contains("geo restricted", true) ||
+                text.contains("geo-restricted", true) ->
                 "The site won't serve this video in your region."
-            text.contains("private", true) ->
-                "That video is private."
-            text.contains("not found", true) || text.contains("removed", true) ->
-                "That video has been removed."
+            PRIVATE.containsMatchIn(text) -> "That video is private."
+            REMOVED.containsMatchIn(text) -> "That video has been removed."
+            NETWORK.containsMatchIn(text) -> "Couldn't reach the site. Check the connection and try again."
             else -> text
         }
     }
@@ -78,6 +90,6 @@ object ProgressText {
             ?.map { it.trim() }
             ?.firstOrNull { it.startsWith("ERROR:", true) }
             ?: return null
-        return line.removePrefix("ERROR:").trim().take(160).ifEmpty { null }
+        return line.removePrefix("ERROR:").trim().ifEmpty { null }
     }
 }

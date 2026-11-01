@@ -3,8 +3,10 @@ package au.com.uulabs.uudownloader.download
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.provider.OpenableColumns
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
+import java.io.FileNotFoundException
 
 data class SavedFile(val uri: Uri, val name: String)
 
@@ -27,6 +29,45 @@ object MimeTypes {
         fileName.substringAfterLast('.', "").ifEmpty { "mp4" }
 }
 
+/** Finding and removing a video, wherever it was written. */
+object SavedFiles {
+
+    /**
+     * True when the file is gone afterwards. A file that had already gone counts, and one the
+     * system refused to delete does not, because the app must not say it removed something
+     * that is still on the phone.
+     */
+    fun delete(context: Context, uri: String?): Boolean {
+        if (uri.isNullOrBlank()) return true
+        val parsed = Uri.parse(uri)
+        val resolver = context.contentResolver
+        return runCatching {
+            // A folder the user picked is a document provider, which refuses ContentResolver.delete.
+            if (DocumentsContract.isDocumentUri(context, parsed)) {
+                DocumentsContract.deleteDocument(resolver, parsed)
+            } else {
+                resolver.delete(parsed, null, null) > 0
+            }
+        }.getOrDefault(false) || !exists(context, uri)
+    }
+
+    /**
+     * False only when the provider says the file is gone. A folder grant that has lapsed proves
+     * nothing about the file, so it still counts as being there.
+     */
+    fun exists(context: Context, uri: String): Boolean = try {
+        context.contentResolver.query(Uri.parse(uri), arrayOf(OpenableColumns.SIZE), null, null, null)
+            ?.use { it.moveToFirst() }
+            ?: true
+    } catch (e: FileNotFoundException) {
+        false
+    } catch (e: IllegalArgumentException) {
+        false
+    } catch (e: Exception) {
+        true
+    }
+}
+
 /**
  * Puts a finished file into the folder the user chose, and returns the handle the app keeps.
  *
@@ -34,16 +75,6 @@ object MimeTypes {
  * write into a folder the user picked on modern Android. A filesystem path would work on
  * exactly one device that happens to have the same layout, and nowhere else.
  */
-/** Removing a video the user asked to be rid of, wherever it was written. */
-object SavedFileRemover {
-    fun delete(context: Context, uri: String?): Boolean {
-        if (uri.isNullOrBlank()) return true
-        return runCatching {
-            context.contentResolver.delete(Uri.parse(uri), null, null) >= 0
-        }.getOrDefault(false)
-    }
-}
-
 object FolderWriter {
 
     fun save(

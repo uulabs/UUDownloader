@@ -16,7 +16,9 @@ import au.com.uulabs.uudownloader.data.UuPrefs
 import au.com.uulabs.uudownloader.download.DownloadHub
 import au.com.uulabs.uudownloader.download.DownloadItem
 import au.com.uulabs.uudownloader.download.DownloadService
-import au.com.uulabs.uudownloader.download.SavedFileRemover
+import au.com.uulabs.uudownloader.download.DownloadState
+import au.com.uulabs.uudownloader.download.EngineUpdate
+import au.com.uulabs.uudownloader.download.SavedFiles
 import au.com.uulabs.uudownloader.update.AppUpdater
 import au.com.uulabs.uudownloader.update.ReleaseInfo
 import au.com.uulabs.uudownloader.download.SourceInfo
@@ -27,7 +29,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -57,7 +58,7 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
 
     private val prefs = UuPrefs(app)
     private val jar = CookieJar(app)
-    private val ytDlp by lazy { YtDlpEngine(app) { jar.path() } }
+    private val ytDlp by lazy { YtDlpEngine.shared(app) }
 
     val items: StateFlow<List<au.com.uulabs.uudownloader.download.DownloadItem>> = DownloadHub.items
 
@@ -114,9 +115,6 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
         /** Long enough for a healthy network, short enough not to feel like a hang. */
         const val PROBE_BUDGET_MS = 45_000L
 
-        /** The update's own network calls have no read timeout; the UI must not rely on them. */
-        const val UPDATE_TIMEOUT_MS = 90_000L
-
         /**
          * A cold start is the natural moment to look, and it is self-limiting: a release
          * published an hour ago should be offered this evening, not tomorrow, while GitHub's
@@ -132,6 +130,8 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
             link = parsed
             sourceInfo = null
             notice = null
+            // A short clip may have taken HQ away; the next video gets the user's own choice.
+            quality = prefs.defaultQuality
             parsed?.let(::scheduleProbe)
         }
     }
@@ -142,6 +142,7 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
         link = null
         sourceInfo = null
         checking = false
+        quality = prefs.defaultQuality
     }
 
     fun chooseDestination(value: Destination) {
@@ -162,10 +163,10 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Ask GitHub, at most twice a day, whether the app or its engine has moved on.
+     * Ask GitHub, at most once an hour, whether the app or its engine has moved on.
      *
-     * Never while a download is running: the engine update takes the wrapper's lock, and a
-     * prompt that arrives mid-download is a prompt nobody can act on.
+     * Never while a download is running: the engine cannot be replaced under a running job, and
+     * a prompt that arrives mid-download is a prompt nobody can act on.
      */
     fun checkForUpdatesOnLaunch() {
         if (DownloadHub.items.value.any { it.state.isRunning }) return
@@ -267,16 +268,23 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun updateEngine(onDone: (String) -> Unit) {
         if (updatingEngine) return
+        if (DownloadHub.isBusy) {
+            onDone("Finish the current download first, then update")
+            return
+        }
         updatingEngine = true
         viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching { withTimeout(UPDATE_TIMEOUT_MS) { ytDlp.updateEngine() } }
-            }
+            val result = withContext(Dispatchers.IO) { runCatching { ytDlp.updateEngine() } }
             updatingEngine = false
             result.fold(
-                onSuccess = { version ->
-                    engineVersion = version ?: engineVersion
-                    onDone("Engine updated to ${version ?: "the latest version"}")
+                onSuccess = { update ->
+                    engineVersion = update.version
+                    onDone(
+                        when (update) {
+                            is EngineUpdate.AlreadyCurrent -> "Already on the latest engine, ${update.version}"
+                            is EngineUpdate.Updated -> "Engine updated to ${update.version}"
+                        }
+                    )
                 },
                 onFailure = { error ->
                     onDone("Couldn't update: ${error.message ?: "no connection"}")
@@ -285,20 +293,22 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Import a browser cookies.txt. Returns null on success, or a message for the user. */
-    fun importCookies(uri: Uri): String? {
-        val result = jar.import(uri)
-        return result.fold(
-            onSuccess = { count ->
-                cookiesAdded = true
-                cookieCount = count
-                notice = null
-                // A site that refused before may answer now, so ask again for the current link.
-                link?.let(::scheduleProbe)
-                null
-            },
-            onFailure = { error -> error.message ?: "That file could not be used" },
-        )
+    /** Import a browser cookies.txt. [onDone] gets null on success, or a message for the user. */
+    fun importCookies(uri: Uri, onDone: (String?) -> Unit) {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { jar.import(uri) }
+            result.fold(
+                onSuccess = { count ->
+                    cookiesAdded = true
+                    cookieCount = count
+                    notice = null
+                    // A site that refused before may answer now, so ask again for the current link.
+                    link?.let(::scheduleProbe)
+                    onDone(null)
+                },
+                onFailure = { error -> onDone(error.message ?: "That file could not be used") },
+            )
+        }
     }
 
     fun removeCookies() {
@@ -315,17 +325,23 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startDownload(): Boolean {
         val current = link ?: return false
-        DownloadHub.enqueue(
+        probeJob?.cancel()
+        ytDlp.cancelProbe()
+        checking = false
+        // Sharing the same link twice while it is still on its way is a slip, not a request.
+        if (DownloadHub.items.value.any { it.url == current.url && it.state.isRunning }) return true
+        val item = DownloadHub.enqueue(
             url = current.url,
             platform = current.platform,
             quality = quality,
             title = sourceInfo?.title,
             siteName = current.siteName,
         )
-        DownloadService.start(getApplication())
-        probeJob?.cancel()
-        ytDlp.cancelProbe()
-        checking = false
+        if (!DownloadService.start(getApplication())) {
+            DownloadHub.finish(item.id, DownloadState.FAILED) {
+                it.copy(error = "Android wouldn't start the download. Open the app and try again.")
+            }
+        }
         return true
     }
 
@@ -344,26 +360,56 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
         storageLimit = limit
     }
 
+    /** Asks the storage provider about every file, so it stays off the main thread. */
     fun refreshUsage() {
-        usageBytes = DownloadHub.retainedBytes()
-    }
-
-    /** Forget one finished download, optionally deleting the file it left behind. */
-    fun forget(item: DownloadItem, deleteFile: Boolean) {
-        if (deleteFile) SavedFileRemover.delete(getApplication(), item.savedUri)
-        DownloadHub.forget(item.id)
-        refreshUsage()
-    }
-
-    /** Forget everything finished. A running job is left alone; it has no file yet. */
-    fun forgetAll(deleteFiles: Boolean) {
-        if (deleteFiles) {
-            DownloadHub.items.value
-                .filter { it.state.isTerminal }
-                .forEach { SavedFileRemover.delete(getApplication(), it.savedUri) }
+        viewModelScope.launch {
+            usageBytes = withContext(Dispatchers.IO) {
+                DownloadHub.reconcile { SavedFiles.exists(getApplication(), it.uri) }
+                DownloadHub.retainedBytes()
+            }
         }
-        DownloadHub.forgetFinished()
-        refreshUsage()
+    }
+
+    /**
+     * Forget one finished download, optionally deleting the file it left behind. If the file
+     * cannot be deleted the row stays, because it is the only way back to that file.
+     */
+    fun forget(item: DownloadItem, deleteFile: Boolean) {
+        viewModelScope.launch {
+            val gone = !deleteFile || withContext(Dispatchers.IO) {
+                SavedFiles.delete(getApplication(), item.savedUri)
+            }
+            if (gone) {
+                DownloadHub.forget(item.id)
+            } else {
+                notice = "Android wouldn't delete ${item.displayName}. It's still in your folder."
+            }
+            refreshUsage()
+        }
+    }
+
+    /**
+     * Forget everything finished. A running job is left alone; it has no file yet. Deleting
+     * reaches every file the app answers for, including those too old to have a row.
+     */
+    fun forgetAll(deleteFiles: Boolean) {
+        viewModelScope.launch {
+            val kept = if (deleteFiles) {
+                withContext(Dispatchers.IO) {
+                    DownloadHub.savedEntries()
+                        .filterNot { SavedFiles.delete(getApplication(), it.uri) }
+                        .map { it.id }
+                        .toSet()
+                }
+            } else {
+                emptySet()
+            }
+            DownloadHub.forgetFinished(keep = kept)
+            if (kept.isNotEmpty()) {
+                notice = "Android wouldn't delete ${kept.size} of those files, so they stay in the list."
+            }
+            refreshUsage()
+        }
     }
 
     /**
@@ -374,7 +420,9 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
     fun handleIncomingText(text: CharSequence?): ShareOutcome {
         val url = SocialLinks.extractUrl(text?.toString()) ?: return ShareOutcome.NONE
         onUrlChanged(url)
-        return if (startDownload()) ShareOutcome.STARTED else ShareOutcome.PREFILLED
+        if (!startDownload()) return ShareOutcome.PREFILLED
+        clearUrl()
+        return ShareOutcome.STARTED
     }
 
     /**

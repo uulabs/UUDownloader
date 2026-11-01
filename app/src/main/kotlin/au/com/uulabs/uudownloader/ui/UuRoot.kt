@@ -47,7 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.com.uulabs.uudownloader.UpdatePrompt
 import au.com.uulabs.uudownloader.UuViewModel
 
-private enum class Screen { HOME, SETTINGS, ABOUT }
+private enum class Screen { HOME, SETTINGS, ABOUT, LICENCES }
 
 @Composable
 fun UuRoot(vm: UuViewModel) {
@@ -79,14 +79,15 @@ fun UuRoot(vm: UuViewModel) {
 
     val cookiePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { picked ->
-            val problem = vm.importCookies(picked)
-            if (problem != null) {
-                Toast.makeText(context, problem, Toast.LENGTH_LONG).show()
+            vm.importCookies(picked) { problem ->
+                if (problem != null) {
+                    Toast.makeText(context, problem, Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
 
-    // One check per launch, at most twice a day, for both the app and its engine.
+    // One check per launch, at most once an hour, for both the app and its engine.
     LaunchedEffect(Unit) { vm.checkForUpdatesOnLaunch() }
 
     vm.updatePrompt?.let { prompt ->
@@ -146,7 +147,9 @@ fun UuRoot(vm: UuViewModel) {
         )
     }
 
-    BackHandler(enabled = screen != Screen.HOME) { screen = Screen.HOME }
+    BackHandler(enabled = screen != Screen.HOME) {
+        screen = if (screen == Screen.LICENCES) Screen.ABOUT else Screen.HOME
+    }
 
     Box(Modifier.fillMaxSize().background(Uu.Ink)) {
         TopGlow(Modifier.align(Alignment.TopCenter))
@@ -188,7 +191,12 @@ fun UuRoot(vm: UuViewModel) {
                         )
                     }
 
-                    Screen.ABOUT -> AboutScreen(onBack = { screen = Screen.SETTINGS })
+                    Screen.ABOUT -> AboutScreen(
+                        onBack = { screen = Screen.SETTINGS },
+                        onOpenLicences = { screen = Screen.LICENCES },
+                    )
+
+                    Screen.LICENCES -> LicencesScreen(onBack = { screen = Screen.ABOUT })
                 }
             }
         }
@@ -196,7 +204,7 @@ fun UuRoot(vm: UuViewModel) {
 }
 
 /**
- * A breath of cyan at the top of the screen. It is the only decoration in the app: enough to
+ * A breath of light at the top of the screen. It is the only decoration in the app: enough to
  * read as UU Labs, not enough to compete with the wordmark.
  */
 @Composable

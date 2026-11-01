@@ -1,6 +1,9 @@
 package au.com.uulabs.uudownloader.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,17 +21,23 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import au.com.uulabs.uudownloader.BuildConfig
 import au.com.uulabs.uudownloader.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
-fun AboutScreen(onBack: () -> Unit) {
+fun AboutScreen(onBack: () -> Unit, onOpenLicences: () -> Unit) {
+    val context = LocalContext.current
     Column(
         Modifier
             .fillMaxSize()
@@ -96,6 +105,20 @@ fun AboutScreen(onBack: () -> Unit) {
                         "${BuildConfig.VERSION_NAME} (${BuildConfig.UU_COMMIT})",
                         color = Uu.Faint,
                     )
+                    Spacer(Modifier.height(14.dp))
+                    Eyebrow("Free software")
+                    Spacer(Modifier.height(9.dp))
+                    MutedLine(
+                        "Licensed under the GNU GPL, version 3 or later.",
+                        color = Uu.Faint,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    LinkLine("Source code for this version") {
+                        val tag = "v${BuildConfig.VERSION_NAME}"
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("$SOURCE_URL/tree/$tag"))
+                        runCatching { context.startActivity(intent) }
+                    }
+                    LinkLine("Licences and notices", onOpenLicences)
                 }
             }
 
@@ -109,5 +132,56 @@ fun AboutScreen(onBack: () -> Unit) {
             )
             Spacer(Modifier.height(40.dp))
         }
+    }
+}
+
+private const val SOURCE_URL = "https://github.com/uulabs/UUDownloader"
+
+@Composable
+private fun LinkLine(text: String, onClick: () -> Unit) {
+    Text(
+        text = text,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 7.dp),
+        style = MaterialTheme.typography.bodyMedium,
+        color = Uu.Text.copy(alpha = 0.85f),
+    )
+}
+
+/** The notices the licences of everything in this app ask to be shown, read from assets. */
+@Composable
+fun LicencesScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val text by produceState("") {
+        value = withContext(Dispatchers.IO) {
+            listOf("licenses/THIRD-PARTY-NOTICES.txt", "licenses/GPL-3.0.txt").joinToString("\n\n") { name ->
+                runCatching { context.assets.open(name).bufferedReader().use { it.readText() } }.getOrDefault("")
+            }
+        }
+    }
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RoundIconButton(Icons.AutoMirrored.Outlined.ArrowBack, "Back", onBack)
+            Spacer(Modifier.width(12.dp))
+            ScreenTitle("Licences")
+        }
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = Uu.Muted,
+        )
+        Spacer(Modifier.height(40.dp))
     }
 }

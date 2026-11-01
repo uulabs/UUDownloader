@@ -6,7 +6,8 @@ import au.com.uulabs.uudownloader.core.Quality
 
 /**
  * Everything the app remembers between launches: where videos go, how good they should be,
- * and the last few that finished. Nothing else survives, and nothing here is a secret.
+ * and the last few that finished. The links in that list are private to the app and are kept
+ * out of backups and device transfers.
  */
 class UuPrefs(context: Context) {
 
@@ -61,11 +62,6 @@ class UuPrefs(context: Context) {
             .putInt(KEY_LIMIT_PERCENT, value.percent)
             .apply()
 
-    /** Whether the one-time background engine update has already succeeded on this install. */
-    var engineUpdated: Boolean
-        get() = prefs.getBoolean(KEY_ENGINE_UPDATED, false)
-        set(value) = prefs.edit().putBoolean(KEY_ENGINE_UPDATED, value).apply()
-
     var lastUpdateCheck: Long
         get() = prefs.getLong(KEY_LAST_UPDATE_CHECK, 0L)
         set(value) = prefs.edit().putLong(KEY_LAST_UPDATE_CHECK, value).apply()
@@ -89,12 +85,19 @@ class UuPrefs(context: Context) {
             if (value == null) remove(KEY_HISTORY) else putString(KEY_HISTORY, value)
         }.apply()
 
+    /** Every file the app has saved and not let go of; what the storage allowance counts. */
+    var savedLedgerJson: String?
+        get() = prefs.getString(KEY_SAVED_LEDGER, null)
+        set(value) = prefs.edit().apply {
+            if (value == null) remove(KEY_SAVED_LEDGER) else putString(KEY_SAVED_LEDGER, value)
+        }.apply()
+
     private companion object {
         const val KEY_DEST_URI = "dest_uri"
         const val KEY_DEST_LABEL = "dest_label"
         const val KEY_QUALITY = "default_quality"
         const val KEY_HISTORY = "history"
-        const val KEY_ENGINE_UPDATED = "engine_updated"
+        const val KEY_SAVED_LEDGER = "saved_ledger"
         const val KEY_LIMIT_MODE = "limit_mode"
         const val KEY_LIMIT_GB = "limit_gb"
         const val KEY_LIMIT_PERCENT = "limit_percent"

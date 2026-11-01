@@ -4,6 +4,7 @@ import android.app.Application
 import au.com.uulabs.uudownloader.data.UuPrefs
 import au.com.uulabs.uudownloader.download.DownloadHub
 import au.com.uulabs.uudownloader.download.HistoryStore
+import au.com.uulabs.uudownloader.download.SavedLedger
 
 /**
  * Attaches history before anything can render it.
@@ -21,8 +22,11 @@ class UuApp : Application() {
             HistoryStore(
                 read = { prefs.historyJson },
                 write = { prefs.historyJson = it },
-            )
+            ),
+            SavedLedger(
+                read = { prefs.savedLedgerJson },
+                write = { prefs.savedLedgerJson = it },
+            ),
         )
-
     }
 }

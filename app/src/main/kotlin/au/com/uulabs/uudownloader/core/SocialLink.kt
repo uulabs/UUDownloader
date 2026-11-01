@@ -1,7 +1,7 @@
 package au.com.uulabs.uudownloader.core
 
 /**
- * The sites the app understands, and nothing else.
+ * The sites the app names. Any other link still goes to the engine under [OTHER].
  *
  * Detection is on the *host* only. A path match would be wrong in the one case that matters:
  * Instagram serves a reel from `instagram.com/reel/...` today and from a different path
@@ -36,7 +36,7 @@ data class SocialLink(val url: String, val host: String, val platform: Platform)
     /**
      * What to call the place the video came from.
      *
-     * The five sites named in the app get their own label. Everything else — and that is
+     * The six sites named in the app get their own label. Everything else — and that is
      * thousands of sites, adult ones included — is named after its domain,
      * because "Link" tells the user nothing about where their video went.
      */
@@ -52,13 +52,20 @@ object SocialLinks {
      * and drop the punctuation that only belongs to the surrounding sentence.
      */
     private val URL_PATTERN = Regex("""https?://[^\s<>"'`]+""", RegexOption.IGNORE_CASE)
-    private val TRAILING_JUNK = charArrayOf('.', ',', ';', ':', ')', ']', '}', '!', '?', '>', '"', '\'')
+    private val TRAILING_JUNK = charArrayOf('.', ',', ';', ':', '!', '?', '>', '"', '\'')
+    private val BRACKETS = mapOf(')' to '(', ']' to '[', '}' to '{')
 
+    /**
+     * The link to act on. A caption can hold several, and the first is often a profile or a
+     * link page, so a site the app can name beats whichever link came first.
+     */
     fun extractUrl(sharedText: String?): String? {
         val text = sharedText?.trim().orEmpty()
         if (text.isEmpty()) return null
-        val raw = URL_PATTERN.find(text)?.value ?: return null
-        return normalize(raw)
+        val urls = URL_PATTERN.findAll(text).mapNotNull { normalize(it.value) }.toList()
+        return urls.firstOrNull { url ->
+            hostOf(url)?.let { host -> Platform.entries.any { it.matches(host) } } == true
+        } ?: urls.firstOrNull()
     }
 
     /** Feed in a URL the user typed or shared; get back a canonical form, or null if it is not one. */
@@ -69,20 +76,33 @@ object SocialLinks {
         return SocialLink(url, host, platform)
     }
 
+    /** Only http and https. Anything else, including a bare "youtu.be/xyz", is not a link here. */
     private fun normalize(candidate: String): String? {
-        if (candidate.isEmpty()) return null
-        val withScheme = when {
-            candidate.startsWith("http://", true) || candidate.startsWith("https://", true) -> candidate
-            // A bare "youtu.be/xyz" typed by hand is still a link; t.co and youtu.be are the
-            // two shorteners people actually retype.
-            candidate.contains("://") -> return null
-            else -> return null
-        }
-        var url = withScheme.trim()
-        while (url.isNotEmpty() && url.last() in TRAILING_JUNK) url = url.dropLast(1)
+        if (!candidate.startsWith("http://", true) && !candidate.startsWith("https://", true)) return null
+        val url = withoutTrailingJunk(candidate.trim())
         val host = hostOf(url) ?: return null
         // A host with no dot ("localhost") is not something a social video comes from.
         if (!host.contains('.')) return null
+        return url
+    }
+
+    /**
+     * Drops the punctuation of the surrounding sentence. A closing bracket goes only when it has
+     * no partner in the link, because "/video_(1)" is an address and "(see /video)" is prose.
+     */
+    private fun withoutTrailingJunk(raw: String): String {
+        var url = raw
+        while (url.isNotEmpty()) {
+            val last = url.last()
+            val opener = BRACKETS[last]
+            val strip = when {
+                last in TRAILING_JUNK -> true
+                opener != null -> url.count { it == last } > url.count { it == opener }
+                else -> false
+            }
+            if (!strip) break
+            url = url.dropLast(1)
+        }
         return url
     }
 

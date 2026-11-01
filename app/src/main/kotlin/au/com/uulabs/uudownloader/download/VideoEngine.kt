@@ -24,6 +24,8 @@ data class DownloadResult(
     val file: File,
     val quality: Quality,
     val note: String? = null,
+    /** The source's own title, which the scratch file's restricted name has lost. */
+    val title: String? = null,
 )
 
 /** One download job: what to fetch, how good, where the engine may write, and its identity. */
@@ -57,4 +59,18 @@ interface VideoEngine {
     fun processIdFor(jobId: String): String = "uudl-$jobId"
 }
 
-class DownloadFailure(message: String, cause: Throwable? = null) : Exception(message, cause)
+/**
+ * The source refused or the job could not finish. [message] is the one line worth reading and
+ * [detail] is everything the engine said, for the person trying to work out why.
+ */
+class DownloadFailure(
+    message: String,
+    cause: Throwable? = null,
+    val detail: String? = null,
+) : Exception(message, cause)
+
+/** The download was cancelled by the user rather than by the source. */
+class CancelledDownload : Exception("cancelled")
+
+/** A "direct" link answered with a web page, so it needs the engine that understands pages. */
+class NotADirectFile : Exception("the link answered with a page")

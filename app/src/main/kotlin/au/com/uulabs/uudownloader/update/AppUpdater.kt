@@ -52,7 +52,7 @@ object AppUpdater {
         runCatching { context.startActivity(intent) }
     }
 
-    internal fun githubJson(url: String): JSONObject = JSONObject(httpGet(url))
+    private fun githubJson(url: String): JSONObject = JSONObject(httpGet(url))
 
     private fun httpGet(url: String): String {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -71,15 +71,23 @@ object AppUpdater {
         }
     }
 
-    /** "1.2.0" is newer than "1.1.9"; a v prefix and any suffix are ignored. */
+    /**
+     * "1.2.0" is newer than "1.1.9". A v prefix and a suffix are ignored, so "1.5.0-2" and
+     * "1.5.0" are the same release. A version that is not numbers is never newer.
+     */
     fun isNewer(candidate: String, current: String): Boolean {
-        val a = candidate.split('.', '-').mapNotNull { it.toIntOrNull() }
-        val b = current.split('.', '-').mapNotNull { it.toIntOrNull() }
+        val a = numbers(candidate) ?: return false
+        val b = numbers(current) ?: return false
         for (index in 0 until maxOf(a.size, b.size)) {
             val left = a.getOrElse(index) { 0 }
             val right = b.getOrElse(index) { 0 }
             if (left != right) return left > right
         }
         return false
+    }
+
+    private fun numbers(version: String): List<Int>? {
+        val parts = version.trim().removePrefix("v").removePrefix("V").substringBefore('-').split('.')
+        return parts.map { it.toIntOrNull() ?: return null }
     }
 }

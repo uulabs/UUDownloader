@@ -38,13 +38,20 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
 
-        val outcome = shareTargetText(intent)?.let(vm::handleIncomingText) ?: ShareOutcome.NONE
+        // The system hands the same intent back on every rotation, and again when the task is
+        // reopened from Recents. A share is one request, so only a genuinely new launch counts.
+        val fromHistory = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
+        val outcome = if (savedInstanceState == null && !fromHistory) {
+            takeSharedText(intent)?.let(vm::handleIncomingText) ?: ShareOutcome.NONE
+        } else {
+            ShareOutcome.NONE
+        }
 
         // A share with everything already set up should leave the user exactly where they were:
         // in the other app, watching. The download lives in the notification shade.
         if (outcome == ShareOutcome.STARTED && notificationsAreVisible()) {
             Toast.makeText(this, "Saving your video…", Toast.LENGTH_SHORT).show()
-            finish()
+            finishAndRemoveTask()
             return
         }
 
@@ -58,17 +65,18 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        setIntent(intent)
-        shareTargetText(intent)?.let(vm::handleIncomingText)
+        takeSharedText(intent)?.let(vm::handleIncomingText)
     }
 
     /**
      * Share text is not a URL. Instagram and Facebook append the caption, so the link has to be
      * found inside it rather than taken as the whole string.
      */
-    private fun shareTargetText(intent: Intent?): CharSequence? {
+    private fun takeSharedText(intent: Intent?): CharSequence? {
         if (intent?.action != Intent.ACTION_SEND) return null
-        return intent.getCharSequenceExtra(Intent.EXTRA_TEXT)
+        val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)
+        setIntent(Intent(this, MainActivity::class.java))
+        return text
     }
 
     private fun notificationsAreVisible(): Boolean {

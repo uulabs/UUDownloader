@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -256,6 +257,17 @@ fun HomeScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = Uu.Text,
                     )
+                    item.errorDetail?.let { detail ->
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            text = detail,
+                            modifier = Modifier
+                                .heightIn(max = 220.dp)
+                                .verticalScroll(rememberScrollState()),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Uu.Muted,
+                        )
+                    }
                     Spacer(Modifier.height(10.dp))
                     MutedLine("${item.siteLabel} · ${item.url}", color = Uu.Faint)
                 }
@@ -266,7 +278,7 @@ fun HomeScreen(
                         .clip(RoundedCornerShape(9.dp))
                         .border(1.dp, Uu.Hairline, RoundedCornerShape(9.dp))
                         .clickable {
-                            clipboard.setText(AnnotatedString(item.error.orEmpty()))
+                            clipboard.setText(AnnotatedString(listOfNotNull(item.error, item.errorDetail).joinToString("\n\n")))
                             detailOf = null
                         }
                         .padding(horizontal = 14.dp, vertical = 8.dp)
