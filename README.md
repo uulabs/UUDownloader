@@ -145,6 +145,12 @@ tools/release.sh publish notes.md
 `build` refuses a dirty tree, an untagged commit or a signing key anyone else can read. It checks
 each APK's certificate and the commit it names before writing `dist/`.
 
+Dependencies are pinned by hash in `gradle/verification-metadata.xml`. After changing one:
+
+```sh
+./gradlew --write-verification-metadata sha256 :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease
+```
+
 ## Architecture
 
 Two download engines, selected by the link:

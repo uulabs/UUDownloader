@@ -135,7 +135,10 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
-            signingConfig signingConfigs.release
+            // Assigning a config with no key would fail the build rather than leave it unsigned.
+            if (rootProject.file("SigningKeys/keystore.properties").exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 
