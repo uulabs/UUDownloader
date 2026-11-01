@@ -131,6 +131,32 @@ object AppUpdater {
         runCatching { context.startActivity(intent) }
     }
 
+    /**
+     * Does the downloaded APK carry the same signing key as the installed app?
+     *
+     * Android refuses an in-place update across different keys, and the failure arrives as a
+     * generic installer error with no explanation. This app changed keys once — from the debug
+     * certificate to a real one, to stop Play Protect calling it an unknown publisher — so the
+     * check is not theoretical: without it, the first update after that change fails silently.
+     */
+    fun signedLikeInstalled(context: Context, apk: File): Boolean = runCatching {
+        val pm = context.packageManager
+        @Suppress("DEPRECATION")
+        val installed = pm.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_SIGNATURES)
+            .signatures?.firstOrNull()?.toByteArray()
+        @Suppress("DEPRECATION")
+        val candidate = pm.getPackageArchiveInfo(apk.absolutePath, android.content.pm.PackageManager.GET_SIGNATURES)
+            ?.signatures?.firstOrNull()?.toByteArray()
+        installed != null && candidate != null && installed.contentEquals(candidate)
+    }.getOrDefault(true)
+
+    /** The page a user lands on when the app cannot install the update itself. */
+    fun openReleasePage(context: Context) {
+        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/$REPO/releases/latest"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(intent) }
+    }
+
     /** Hand the APK to the system installer. Android still asks the user to confirm. */
     fun install(context: Context, apk: File) {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.updates", apk)

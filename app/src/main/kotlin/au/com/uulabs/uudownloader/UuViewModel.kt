@@ -264,6 +264,15 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
             updateProgress = null
             result.fold(
                 onSuccess = { file ->
+                    if (!AppUpdater.signedLikeInstalled(getApplication(), file)) {
+                        // A different key cannot install over this one. Android would only say
+                        // "App not installed", so say why and send them to the release page.
+                        appUpdate = null
+                        updateNote = "This build is signed with a new key. Uninstall UU Downloader, " +
+                            "then install it fresh — settings will not carry over"
+                        AppUpdater.openReleasePage(getApplication())
+                        return@fold
+                    }
                     val opened = runCatching { AppUpdater.install(getApplication(), file) }
                     if (opened.isFailure) updateNote = "Couldn't open the installer"
                 },

@@ -8,3 +8,6 @@ captures/
 app/release/
 app/build/
 dist/
+
+# Release signing material stays off the repository.
+SigningKeys/
