@@ -47,7 +47,7 @@ build)
     # The autoupdate build: same app plus the in-app installer, which is what Play Protect
     # reports as a harmful app. Shipped as one universal APK, because the point of it is to be
     # the build that replaces itself.
-    auto="$out/app-universal-autoupdate.apk"
+    auto="app/build/outputs/apk/autoupdate/app-universal-autoupdate.apk"
     cert="$("$apksigner" verify --print-certs "$auto" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
     [ "$cert" = "$EXPECTED_CERT" ] || die "$auto is signed with $cert"
     unzip -p "$auto" 'classes*.dex' | LC_ALL=C grep -aq "$commit" || die "$auto does not name commit $commit"
