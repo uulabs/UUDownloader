@@ -137,8 +137,8 @@ fun SettingsScreen(
             }
             Spacer(Modifier.height(12.dp))
             MutedLine(
-                "Android won't let an app write into Download itself, so videos go in a folder " +
-                    "inside it.",
+                "Videos are saved to Movies, where the gallery indexes them with their dates. " +
+                    "Pick any other folder if you would rather keep them elsewhere.",
                 color = Uu.Faint,
                 maxLines = Int.MAX_VALUE,
             )

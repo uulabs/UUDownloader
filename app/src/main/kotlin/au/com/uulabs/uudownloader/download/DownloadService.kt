@@ -178,7 +178,7 @@ class DownloadService : Service() {
                 )
             }
             watchdog = scope.launch { watch(item, workDir, usedBefore, limitBytes) }
-            val destination = prefs?.destination ?: Destination.Downloads
+            val destination = prefs?.destination ?: Destination.MediaLibrary
             val result = fetch(item, workDir)
             val file = result.file
 
@@ -203,7 +203,7 @@ class DownloadService : Service() {
             val title = DownloadHub.items.value.firstOrNull { it.id == item.id }?.title ?: file.nameWithoutExtension
             val preferredName = FileNames.fromTitle(title, extension = extension)
             val saved = when (destination) {
-                Destination.Downloads -> MediaStoreWriter.save(this, file, preferredName)
+                Destination.MediaLibrary -> MediaStoreWriter.save(this, file, preferredName)
                 is Destination.Custom -> FolderWriter.save(this, destination.uri, file, preferredName)
             }
             DownloadHub.finish(item.id, DownloadState.DONE) {

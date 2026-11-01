@@ -238,11 +238,6 @@ private fun folderLabel(context: Context, uri: Uri): String {
 }
 
 private fun openVideo(context: Context, uri: String) {
-    val intent = Intent(Intent.ACTION_VIEW)
-        .setDataAndType(Uri.parse(uri), "video/*")
-        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-    val opened = runCatching { context.startActivity(intent) }.isSuccess
-    if (!opened) {
-        Toast.makeText(context, "Nothing on this device can open that video", Toast.LENGTH_SHORT).show()
-    }
+    VideoLauncher.open(context, uri)
 }
+

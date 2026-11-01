@@ -15,8 +15,18 @@ sealed interface Destination {
 
     val label: String
 
-    data object Downloads : Destination {
-        override val label: String = "Downloads / UU Downloader"
+    /**
+     * The device's media library, in `Movies/UU Downloader`.
+     *
+     * It was `Download/UU Downloader` until the dates came up wrong. A row written through the
+     * Downloads collection reports DATE_TAKEN as NULL — the provider refuses to store it — and
+     * galleries that label by that column showed every video as 1 January 1970. The video
+     * collection keeps DATE_TAKEN, but only accepts DCIM, Movies and Pictures, so videos moved
+     * to Movies. Android's own guidance puts video there anyway; audio and anything else still
+     * goes to Download.
+     */
+    data object MediaLibrary : Destination {
+        override val label: String = "Movies / UU Downloader"
     }
 
     data class Custom(val uri: Uri, val name: String) : Destination {

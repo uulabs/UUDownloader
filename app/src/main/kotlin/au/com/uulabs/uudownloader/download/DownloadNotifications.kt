@@ -114,17 +114,8 @@ object DownloadNotifications {
         )
     }
 
-    private fun openFile(context: Context, uri: String): PendingIntent {
-        val intent = Intent(Intent.ACTION_VIEW)
-            .setDataAndType(android.net.Uri.parse(uri), "video/*")
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-        return PendingIntent.getActivity(
-            context,
-            1,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-    }
+    private fun openFile(context: Context, uri: String): PendingIntent =
+        au.com.uulabs.uudownloader.ui.VideoLauncher.pendingIntent(context, uri, requestCode = 1)
 
     private fun cancelIntent(context: Context, itemId: String): PendingIntent {
         val intent = Intent(context, DownloadService::class.java)

@@ -152,7 +152,7 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
         notice = null
     }
 
-    fun useDefaultDestination() = chooseDestination(Destination.Downloads)
+    fun useDefaultDestination() = chooseDestination(Destination.MediaLibrary)
 
     fun selectQuality(value: Quality) {
         quality = value

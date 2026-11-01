@@ -21,17 +21,32 @@ object MediaStoreWriter {
 
     fun save(context: Context, source: File, preferredName: String): SavedFile {
         val resolver = context.contentResolver
+        val now = System.currentTimeMillis()
+        val isVideo = MimeTypes.of(preferredName).startsWith("video/")
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, preferredName)
+            // Without these the row reports 0 and every gallery shows 1 January 1970.
+            // DATE_TAKEN is milliseconds, the other two are seconds.
+            if (isVideo) put(MediaStore.MediaColumns.DATE_TAKEN, now)
+            put(MediaStore.MediaColumns.DATE_ADDED, now / 1000)
+            put(MediaStore.MediaColumns.DATE_MODIFIED, now / 1000)
             put(MediaStore.MediaColumns.MIME_TYPE, MimeTypes.of(preferredName))
             put(
                 MediaStore.MediaColumns.RELATIVE_PATH,
-                "${Environment.DIRECTORY_DOWNLOADS}/${Destination.FOLDER_NAME}",
+                "${if (isVideo) Environment.DIRECTORY_MOVIES else Environment.DIRECTORY_DOWNLOADS}/" +
+                    Destination.FOLDER_NAME,
             )
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
 
-        val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        // Video goes into the video collection under Movies; only that collection stores
+        // DATE_TAKEN, and without it galleries date the file from the epoch. Other media keeps
+        // the Downloads collection so it stays with downloads where it belongs.
+        val collection = if (isVideo) {
+            MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        } else {
+            MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        }
         val uri = resolver.insert(collection, values)
             ?: throw DownloadFailure("Couldn't create the file in Downloads")
 
@@ -43,6 +58,7 @@ object MediaStoreWriter {
             }
             resolver.update(uri, ContentValues().apply {
                 put(MediaStore.MediaColumns.IS_PENDING, 0)
+                put(MediaStore.MediaColumns.DATE_MODIFIED, System.currentTimeMillis() / 1000)
             }, null, null)
         } catch (e: Exception) {
             runCatching { resolver.delete(uri, null, null) }

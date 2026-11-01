@@ -25,11 +25,11 @@ class UuPrefs(context: Context) {
                     )
                 }
             }
-            return Destination.Downloads
+            return Destination.MediaLibrary
         }
         set(value) = prefs.edit().apply {
             when (value) {
-                Destination.Downloads -> {
+                Destination.MediaLibrary -> {
                     remove(KEY_DEST_URI)
                     remove(KEY_DEST_LABEL)
                 }

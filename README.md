@@ -17,8 +17,9 @@ and paste one.
 - **Normal or HQ.** HQ saves the best version this phone can actually play, up to 4K, based on the
   decoders the phone reports. It is offered only when the source has something above 720p and the
   phone can play it; otherwise the choice is not shown.
-- **No setup required.** Videos are written to `Download/UU Downloader` without a permission
-  prompt. Any other folder can be selected through the system picker.
+- **No setup required.** Videos are written to `Movies/UU Downloader` without a permission
+  prompt, where the gallery indexes them with a real date. Any other folder can be selected
+  through the system picker.
 - **Progress you can act on.** A silent foreground notification reports percent, size, speed and
   ETA, with a cancel action. Completed files get their own notification.
 - **Storage allowance.** A limit in gigabytes or a percentage of the device, enforced before a
