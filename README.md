@@ -14,8 +14,9 @@ and paste one.
   Facebook send, and starts the download without further taps.
 - **Paste and download.** One field, one button. The link is validated as you type and the site
   is named as soon as it is recognised.
-- **Normal or HQ.** HQ is offered only when the source has something above 720p; if it does not,
-  the choice is not shown.
+- **Normal or HQ.** HQ saves the best version this phone can actually play, up to 4K, based on the
+  decoders the phone reports. It is offered only when the source has something above 720p and the
+  phone can play it; otherwise the choice is not shown.
 - **No setup required.** Videos are written to `Download/UU Downloader` without a permission
   prompt. Any other folder can be selected through the system picker.
 - **Progress you can act on.** A silent foreground notification reports percent, size, speed and
@@ -53,7 +54,7 @@ agent, because CDNs commonly refuse an unfamiliar one.
 | `UUDownloader-<version>-universal.apk` | both architectures in one file |
 
 ```sh
-adb install -r UUDownloader-1.6.0-arm64.apk
+adb install -r UUDownloader-1.6.1-arm64.apk
 ```
 
 Releases are signed with a dedicated UU Labs key, so a newer build installs over an older one
@@ -216,7 +217,8 @@ copy button.
   ended.
 - A link to a playlist, channel or multi-video post saves its first video, and says so when the
   site reports how many there are.
-- Quality is whatever the source offers.
+- Quality is limited by what the source offers and what the phone can decode. A file saved for a
+  capable phone may not play on an older one if it is copied across.
 - One download runs at a time; further links wait in the queue.
 
 ## Licence

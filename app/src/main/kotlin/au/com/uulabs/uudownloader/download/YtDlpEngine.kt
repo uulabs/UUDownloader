@@ -87,6 +87,7 @@ class YtDlpEngine private constructor(
                 false
             }
             UuLog.i("yt-dlp init: complete, canMerge=$canMerge")
+            UuLog.i("playback limits: ${DeviceCodecs.limits?.codecs ?: "unknown"}")
             ready = true
         }
     }
@@ -286,7 +287,9 @@ class YtDlpEngine private constructor(
             engineLock.read {
                 withRunCookies { cookies ->
                     val command = YoutubeDLRequest(request.url).addCommands(
-                        EngineOptions.downloadCommand(quality, merge, client, workDir.absolutePath, cookies?.absolutePath)
+                        EngineOptions.downloadCommand(
+                            quality, merge, client, workDir.absolutePath, cookies?.absolutePath, DeviceCodecs.limits,
+                        )
                     )
                     YoutubeDL.execute(command, processId) { percent, _, line ->
                         onProgress(

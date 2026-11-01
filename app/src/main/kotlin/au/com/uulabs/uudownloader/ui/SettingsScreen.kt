@@ -155,7 +155,7 @@ fun SettingsScreen(
                 Column {
                     QualityRow(
                         title = "HQ",
-                        detail = "The best the site offers. Bigger files, sharper picture.",
+                        detail = vm.highQualityDetail(),
                         selected = vm.quality == Quality.HIGH,
                         onClick = { vm.selectQuality(Quality.HIGH) },
                     )

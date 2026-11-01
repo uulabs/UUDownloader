@@ -519,7 +519,7 @@ private fun QualitySection(vm: UuViewModel) {
             when {
                 height != null && height > 720 -> "This one goes up to ${height}p. HQ is worth it."
                 height != null -> "This one tops out at ${height}p, so Normal is the same file."
-                else -> "Normal keeps it small. HQ saves the best the site offers."
+                else -> "Normal keeps it small. HQ saves the best this phone can play."
             },
             color = Uu.Faint,
         )

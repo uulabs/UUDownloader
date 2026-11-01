@@ -13,6 +13,7 @@ import au.com.uulabs.uudownloader.data.CookieJar
 import au.com.uulabs.uudownloader.data.Destination
 import au.com.uulabs.uudownloader.data.StorageLimit
 import au.com.uulabs.uudownloader.data.UuPrefs
+import au.com.uulabs.uudownloader.download.DeviceCodecs
 import au.com.uulabs.uudownloader.download.DownloadHub
 import au.com.uulabs.uudownloader.download.DownloadItem
 import au.com.uulabs.uudownloader.download.DownloadService
@@ -318,7 +319,11 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun availableQualities(): List<Quality> =
-        if (checking) Quality.entries.toList() else QualityChoice.options(sourceInfo?.maxHeight)
+        if (checking && QualityChoice.offersHigh(null, DeviceCodecs.limits)) {
+            Quality.entries.toList()
+        } else {
+            QualityChoice.options(sourceInfo?.maxHeight, DeviceCodecs.limits)
+        }
 
     val canDownload: Boolean
         get() = link != null && !DownloadHub.isBusy
@@ -456,10 +461,20 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
             if (link?.url != target.url) return@launch
             if (info != null) {
                 sourceInfo = info
-                if (!QualityChoice.offersHigh(info.maxHeight) && quality == Quality.HIGH) {
+                if (!QualityChoice.offersHigh(info.maxHeight, DeviceCodecs.limits) && quality == Quality.HIGH) {
                     quality = Quality.NORMAL
                 }
             }
+        }
+    }
+
+    /** What HQ means on this phone, in the words Settings uses. */
+    fun highQualityDetail(): String {
+        val limit = DeviceCodecs.limits?.maxShortEdge ?: 0
+        return if (limit > 0) {
+            "The best this phone can play, up to ${limit}p. Bigger files, sharper picture."
+        } else {
+            "The best the site offers. Bigger files, sharper picture."
         }
     }
 

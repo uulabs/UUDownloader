@@ -1,9 +1,11 @@
 package au.com.uulabs.uudownloader
 
+import au.com.uulabs.uudownloader.core.CodecLimit
 import au.com.uulabs.uudownloader.core.DirectLinks
 import au.com.uulabs.uudownloader.core.EngineOptions
 import au.com.uulabs.uudownloader.core.LogRedaction
 import au.com.uulabs.uudownloader.core.FileNames
+import au.com.uulabs.uudownloader.core.PlaybackLimits
 import au.com.uulabs.uudownloader.core.Platform
 import au.com.uulabs.uudownloader.core.Quality
 import au.com.uulabs.uudownloader.core.QualityChoice
@@ -11,6 +13,7 @@ import au.com.uulabs.uudownloader.data.ByteSize
 import au.com.uulabs.uudownloader.data.LimitMode
 import au.com.uulabs.uudownloader.data.StorageLimit
 import au.com.uulabs.uudownloader.core.SocialLinks
+import au.com.uulabs.uudownloader.core.VideoCodec
 import au.com.uulabs.uudownloader.download.DownloadItem
 import au.com.uulabs.uudownloader.download.DownloadState
 import au.com.uulabs.uudownloader.download.HistoryStore
@@ -131,7 +134,7 @@ class CoreTest {
     fun `a build without ffmpeg never asks yt-dlp to merge`() {
         // +ba means "also fetch the audio stream and join it", which needs ffmpeg.
         assertTrue(!QualityChoice.selector(Quality.HIGH, canMerge = false).contains("+ba"))
-        assertTrue(QualityChoice.selector(Quality.HIGH, canMerge = true).contains("+ba"))
+        assertTrue(QualityChoice.selector(Quality.HIGH, canMerge = true).contains("+(ba"))
     }
 
     // ---- filenames ---------------------------------------------------------
@@ -503,5 +506,127 @@ class CoreTest {
             java.io.File(root, "LICENSE").readText(),
             java.io.File(root, "app/src/main/assets/licenses/GPL-3.0.txt").readText(),
         )
+    }
+
+    // ---- what this phone can play ------------------------------------------
+
+    private val midRange = PlaybackLimits(
+        listOf(
+            CodecLimit(VideoCodec.VP9, shortEdgeAt30 = 2160, shortEdgeAt60 = 1080),
+            CodecLimit(VideoCodec.H264, shortEdgeAt30 = 1080, shortEdgeAt60 = 1080),
+        ),
+    )
+
+    @Test
+    fun `hq never asks first for a codec the phone cannot decode`() {
+        val selector = QualityChoice.selector(Quality.HIGH, canMerge = true, limits = midRange)
+        val playable = selector.substringBefore("/bv*[height<=2160]+")
+        assertTrue(VideoCodec.AV1.ytDlpPattern !in playable, playable)
+        assertTrue(VideoCodec.HEVC.ytDlpPattern !in playable, playable)
+        assertTrue(VideoCodec.VP9.ytDlpPattern in playable, playable)
+        assertTrue(VideoCodec.H264.ytDlpPattern in playable, playable)
+    }
+
+    @Test
+    fun `the phone's limit in each codec is respected`() {
+        val alternatives = midRange.alternatives("bv*")
+        // H.264 only reaches 1080 here, so it must not be asked for at 1440 or 2160.
+        assertTrue(alternatives.none { "[height<=3840]" in it && "avc1" in it })
+        assertTrue(alternatives.none { "[height<=2560]" in it && "avc1" in it })
+        assertTrue(alternatives.any { "[height<=3840]" in it && "vp0?9" in it })
+    }
+
+    @Test
+    fun `sizes run largest first, so a smaller stream cannot beat a larger one`() {
+        val alternatives = midRange.alternatives("bv*")
+        val at1080 = alternatives.indexOfFirst { "avc1" in it && "[height<=1920]" in it }
+        val at720 = alternatives.indexOfFirst { "vp0?9" in it && "[height<=1280]" in it }
+        assertTrue(at1080 in 0 until at720, "1080p H.264 must come before 720p VP9")
+        assertTrue(alternatives.all { "[height>" in it }, "every band needs a floor")
+    }
+
+    @Test
+    fun `within a size, a codec that manages 60 frames comes first`() {
+        val limits = PlaybackLimits(
+            listOf(
+                CodecLimit(VideoCodec.AV1, shortEdgeAt30 = 1080, shortEdgeAt60 = 720),
+                CodecLimit(VideoCodec.H264, shortEdgeAt30 = 1080, shortEdgeAt60 = 1080),
+            ),
+        )
+        val at1080 = limits.alternatives("bv*").filter { "[height<=1920]" in it }
+        assertTrue("avc1" in at1080.first(), at1080.first())
+        assertTrue("[fps" !in at1080.first(), at1080.first())
+        assertTrue("[fps<=?30]" in at1080.last() && "av01" in at1080.last(), at1080.last())
+    }
+
+    @Test
+    fun `a portrait clip fits the same band as its landscape twin`() {
+        val band = PlaybackLimits.SIZE_BANDS.first { it.shortEdge == 1080 }
+        assertTrue("[width<=1920]" in band.filter && "[height<=1920]" in band.filter, band.filter)
+        assertTrue("[width>720]" in band.filter && "[height>720]" in band.filter, band.filter)
+    }
+
+    @Test
+    fun `hq is not offered when the phone cannot beat normal`() {
+        val weak = PlaybackLimits(listOf(CodecLimit(VideoCodec.H264, 720, 480)))
+        assertEquals(listOf(Quality.NORMAL), QualityChoice.options(2160, weak))
+        assertEquals(listOf(Quality.NORMAL), QualityChoice.options(null, weak))
+        assertEquals(listOf(Quality.NORMAL, Quality.HIGH), QualityChoice.options(2160, midRange))
+        assertEquals(listOf(Quality.NORMAL), QualityChoice.options(720, midRange))
+    }
+
+    @Test
+    fun `normal wants a single file within 720 but will join two rather than fail`() {
+        val selector = QualityChoice.selector(Quality.NORMAL, canMerge = true, limits = midRange)
+        assertTrue("[height<=1920]" !in selector, selector)
+        assertTrue(selector.startsWith("b[width>480]"), selector)
+        assertTrue(selector.indexOf("/b[") < selector.indexOf("+"), selector)
+        assertTrue("bv*[height<=720]+" in selector, selector)
+        assertTrue("+" !in QualityChoice.selector(Quality.NORMAL, canMerge = false, limits = midRange))
+    }
+
+    @Test
+    fun `codec patterns cover the names sites actually use`() {
+        val matches = { codec: VideoCodec, name: String -> Regex(codec.ytDlpPattern).containsMatchIn(name) }
+        assertTrue(matches(VideoCodec.VP9, "vp9"))
+        assertTrue(matches(VideoCodec.VP9, "vp09.00.41.08"))
+        assertTrue(matches(VideoCodec.H264, "avc1.4D401F"))
+        assertTrue(matches(VideoCodec.H264, "h264"))
+        assertTrue(matches(VideoCodec.HEVC, "hvc1.1.6.L120.90"))
+        assertTrue(matches(VideoCodec.HEVC, "h265"))
+        assertTrue(matches(VideoCodec.AV1, "av01.0.13M.08"))
+        assertTrue(!matches(VideoCodec.VP9, "av01.0.13M.08"))
+        assertTrue(!matches(VideoCodec.H264, "none"))
+    }
+
+    @Test
+    fun `a source offering nothing playable still saves something`() {
+        for (quality in Quality.entries) {
+            for (merge in listOf(true, false)) {
+                assertTrue(QualityChoice.selector(quality, merge, midRange).endsWith("/b"))
+            }
+        }
+    }
+
+    @Test
+    fun `a build without ffmpeg never merges, even with limits`() {
+        assertTrue("+" !in QualityChoice.selector(Quality.HIGH, canMerge = false, limits = midRange))
+    }
+
+    @Test
+    fun `unknown limits leave the request as it was`() {
+        assertEquals(
+            "bv*[height<=2160]+(ba[ext=m4a]/ba)/b[height<=2160]/b",
+            QualityChoice.selector(Quality.HIGH, canMerge = true, limits = null),
+        )
+    }
+
+    @Test
+    fun `a source with nothing playable still stays within the phone's size`() {
+        val weak = PlaybackLimits(listOf(CodecLimit(VideoCodec.H264, 1080, 720)))
+        val selector = QualityChoice.selector(Quality.HIGH, canMerge = true, limits = weak)
+        val capped = selector.indexOf("bv*[width<=1920][height<=1920]+")
+        assertTrue(capped > 0, selector)
+        assertTrue(capped < selector.indexOf("bv*[height<=2160]"), selector)
     }
 }

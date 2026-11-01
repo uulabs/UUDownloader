@@ -35,9 +35,10 @@ object EngineOptions {
         client: String?,
         workDir: String,
         cookies: String?,
+        limits: PlaybackLimits? = null,
     ): List<String> = buildList {
         val dir = workDir.replace("%", "%%")
-        add("-f"); add(QualityChoice.selector(quality, canMerge))
+        add("-f"); add(QualityChoice.selector(quality, canMerge, limits))
         if (canMerge) {
             add("--merge-output-format"); add("mp4")
         }

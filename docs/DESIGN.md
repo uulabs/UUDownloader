@@ -36,6 +36,26 @@ The same run is limited to one item. `--no-playlist` only covers a video that ha
 playlist; a link that *is* a playlist or a channel would otherwise download all of it and keep one.
 Live streams are filtered out, because they never end.
 
+### "Best quality" means the best this phone can play
+
+Left alone, yt-dlp takes the best stream a site offers, which on YouTube is often 4K AV1. Neither
+test phone has an AV1 hardware decoder, so that gave a very large file the phone could not play
+smoothly, and the app called it a success.
+
+So the app asks the phone. `DeviceCodecs` reads Android's decoder list for AV1, VP9, HEVC and H.264,
+and records the largest picture each manages at 30 and at 60 frames a second. Only hardware decoders
+count, because software decoders accept 4K AV1 on paper and then stutter through it on a phone's CPU.
+The exception is H.264 up to 720p, which any phone's CPU can handle.
+
+`PlaybackLimits` turns that into a list for yt-dlp, which takes the first entry that exists. It runs
+from the largest picture down, because resolution is what people notice, and each size band has a
+floor as well as a ceiling: without one, a 480p VP9 stream would satisfy "VP9 up to 4K" and beat the
+1080p H.264 stream beside it. Sizes are matched on the short edge, so a portrait 1080x1920 clip asks
+the same of a decoder as a landscape 1920x1080 one. HDR streams are left out, and AAC audio is preferred.
+
+If a source offers nothing the phone can decode, it still saves something, kept within the phone's
+largest size, because a file that may be hard to play beats an error.
+
 ### One engine per process
 
 The screen and the service share a single `YtDlpEngine`, because what it guards is per process: the
