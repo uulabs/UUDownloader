@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.content.FileProvider
+import au.com.uulabs.uudownloader.BuildConfig
 import au.com.uulabs.uudownloader.UuLog
 import java.io.File
 import java.net.HttpURLConnection
@@ -139,16 +140,28 @@ object AppUpdater {
      * certificate to a real one, to stop Play Protect calling it an unknown publisher — so the
      * check is not theoretical: without it, the first update after that change fails silently.
      */
-    fun signedLikeInstalled(context: Context, apk: File): Boolean = runCatching {
-        val pm = context.packageManager
-        @Suppress("DEPRECATION")
-        val installed = pm.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_SIGNATURES)
-            .signatures?.firstOrNull()?.toByteArray()
-        @Suppress("DEPRECATION")
-        val candidate = pm.getPackageArchiveInfo(apk.absolutePath, android.content.pm.PackageManager.GET_SIGNATURES)
-            ?.signatures?.firstOrNull()?.toByteArray()
-        installed != null && candidate != null && installed.contentEquals(candidate)
-    }.getOrDefault(true)
+    fun signedLikeInstalled(context: Context, apk: File): Boolean {
+        if (BuildConfig.DEBUG) return true
+        // Compare the *installed* app against the certificate this build expects to have.
+        // Reading signatures out of a downloaded APK was the obvious approach and the wrong
+        // one: PackageManager's archive signatures come back null on modern Android, so the
+        // check passed for a debug-signed copy it should have refused.
+        val expected = BuildConfig.UU_CERT_SHA256.lowercase().replace(":", "")
+        val installed = installedCertDigest(context) ?: return true
+        return installed == expected
+    }
+
+    private fun installedCertDigest(context: Context): String? = runCatching {
+        val info = context.packageManager.getPackageInfo(
+            context.packageName,
+            android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES,
+        )
+        val certificate = info.signingInfo?.apkContentsSigners?.firstOrNull()?.toByteArray()
+            ?: return@runCatching null
+        java.security.MessageDigest.getInstance("SHA-256")
+            .digest(certificate)
+            .joinToString("") { "%02x".format(it) }
+    }.getOrNull()
 
     /** The page a user lands on when the app cannot install the update itself. */
     fun openReleasePage(context: Context) {

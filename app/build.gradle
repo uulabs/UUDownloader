@@ -49,11 +49,15 @@ android {
         // works without asking for any storage permission at all.
         minSdk 29
         targetSdk 36
-        versionCode 15
-        versionName "1.4.0"
+        versionCode 16
+        versionName "1.4.1"
 
         buildConfigField "String", "UU_COMMIT", "\"${uuCommit}${uuDirty ? "-dirty" : ""}\""
         buildConfigField "boolean", "UU_FFMPEG", "${uuFfmpeg}"
+        // The release certificate this app expects to find on itself, so a copy signed with an
+        // older key can be recognised instead of failing inside Android's installer.
+        buildConfigField "String", "UU_CERT_SHA256",
+            "\"c712981a5a325fe742a1d3afbd20b6f4a63ab05e1a7e83ba0d0098703915b29a\""
 
         // Both test handsets are ARM (a 32-bit Blade A3 Plus and a 64-bit arm64 device).
         // Shipping x86 payloads nobody will run only makes the download bigger.
