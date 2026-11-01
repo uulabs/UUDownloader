@@ -39,7 +39,7 @@ sealed interface UpdatePrompt {
 }
 
 /** What the updates row is doing right now. */
-enum class UpdateBusy { NONE, CHECKING, DOWNLOADING }
+enum class UpdateBusy { NONE, CHECKING }
 
 /** What happened to a link that arrived from the share sheet. */
 enum class ShareOutcome {
@@ -95,9 +95,6 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     var updateBusy by mutableStateOf(UpdateBusy.NONE)
-        private set
-
-    var updateProgress by mutableStateOf<Float?>(null)
         private set
 
     /** One line of plain feedback for the updates row. */
@@ -214,7 +211,7 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
         when (val prompt = updatePrompt) {
             is UpdatePrompt.App -> {
                 updatePrompt = null
-                installAppUpdate()
+                openAppDownload()
             }
             is UpdatePrompt.Engine -> {
                 updatePrompt = null
@@ -243,42 +240,15 @@ class UuViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun installAppUpdate() {
-        val info = appUpdate ?: return
-        if (updateBusy != UpdateBusy.NONE) return
-
-        // Asking Android for the permission first is cheaper than downloading 60 MB to find
-        // out that the installer will not open.
-        if (!AppUpdater.canInstall(getApplication())) {
-            updateNote = "Allow UU Downloader to install apps, then press Install again"
-            AppUpdater.openInstallPermission(getApplication())
-            return
-        }
-        updateBusy = UpdateBusy.DOWNLOADING
-        updateProgress = 0f
-        viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching { AppUpdater.download(getApplication(), info) { p -> updateProgress = p } }
-            }
-            updateBusy = UpdateBusy.NONE
-            updateProgress = null
-            result.fold(
-                onSuccess = { file ->
-                    if (!AppUpdater.signedLikeInstalled(getApplication(), file)) {
-                        // A different key cannot install over this one. Android would only say
-                        // "App not installed", so say why and send them to the release page.
-                        appUpdate = null
-                        updateNote = "This build is signed with a new key. Uninstall UU Downloader, " +
-                            "then install it fresh — settings will not carry over"
-                        AppUpdater.openReleasePage(getApplication())
-                        return@fold
-                    }
-                    val opened = runCatching { AppUpdater.install(getApplication(), file) }
-                    if (opened.isFailure) updateNote = "Couldn't open the installer"
-                },
-                onFailure = { updateNote = it.message ?: "Download failed" },
-            )
-        }
+    /**
+     * Send the user to the release page for the new build.
+     *
+     * The app deliberately does not download or install it: an APK dropper is what Play Protect
+     * flags, and no signing key changes that. The browser and Android's installer do this part.
+     */
+    fun openAppDownload() {
+        AppUpdater.openReleasePage(getApplication())
+        updateNote = "Opened the release page in your browser"
     }
 
     /** Read the engine version once, off the main thread; the first call unpacks Python. */

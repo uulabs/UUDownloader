@@ -104,7 +104,7 @@ fun UuRoot(vm: UuViewModel) {
                 MutedLine(
                     text = when (prompt) {
                         is UpdatePrompt.App ->
-                            "Version ${prompt.info.version} is ready to install. Android will ask you to confirm."
+                            "Version ${prompt.info.version} is out. The app opens the release page — the browser downloads it and Android installs it."
                         is UpdatePrompt.Engine ->
                             "yt-dlp ${prompt.version} is available. Updating is what keeps YouTube and the rest working as they change."
                     },
@@ -124,7 +124,7 @@ fun UuRoot(vm: UuViewModel) {
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = if (engine) "Update" else "Install",
+                        text = if (engine) "Update" else "Get it",
                         style = MaterialTheme.typography.labelLarge,
                         color = Uu.Text,
                     )

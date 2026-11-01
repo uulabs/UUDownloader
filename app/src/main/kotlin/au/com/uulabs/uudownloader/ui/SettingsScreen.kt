@@ -235,8 +235,6 @@ fun SettingsScreen(
                         )
                         Spacer(Modifier.height(3.dp))
                         val status = when {
-                            vm.updateBusy == UpdateBusy.DOWNLOADING ->
-                                "Downloading ${((vm.updateProgress ?: 0f) * 100).toInt()}%"
                             vm.updateBusy == UpdateBusy.CHECKING -> "Checking GitHub…"
                             vm.appUpdate != null -> "${vm.appUpdate?.version} is available"
                             else -> vm.updateNote ?: "Checked against GitHub releases"
@@ -254,14 +252,14 @@ fun SettingsScreen(
                                 RoundedCornerShape(9.dp),
                             )
                             .clickable(enabled = vm.updateBusy == UpdateBusy.NONE) {
-                                if (installable) vm.installAppUpdate() else vm.checkAppUpdate()
+                                if (installable) vm.openAppDownload() else vm.checkAppUpdate()
                             }
                             .padding(horizontal = 12.dp, vertical = 7.dp)
                     ) {
                         Text(
                             text = when {
                                 vm.updateBusy != UpdateBusy.NONE -> "Working"
-                                installable -> "Install"
+                                installable -> "Get it"
                                 else -> "Check"
                             },
                             style = MaterialTheme.typography.labelLarge,

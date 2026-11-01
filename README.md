@@ -54,9 +54,13 @@ Those are the site's rules to set, and the request either passes them honestly o
 ## Updating
 
 The app checks **its own GitHub releases** (`uulabs/UUDownloader`) from
-**Settings → App updates → Check**. If a newer tag exists it offers Install, downloads the APK
-that matches the phone's architecture, and hands it to Android's package installer — which
-still asks the user to confirm. Nothing installs itself.
+**Settings → App updates → Check**, and on launch at most hourly. If a newer tag exists it says
+so and opens the release page; the browser downloads the APK and Android's installer takes over.
+
+It deliberately does **not** download or install the APK itself. An app that fetches APKs and
+hands them to the installer is the shape Google Play Protect scans for as a dropper, and it
+flagged every build that did — including a properly signed one. One extra tap is worth not
+being classed as malware.
 
 For that to find anything, a release has to exist with these assets attached:
 

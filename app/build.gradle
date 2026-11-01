@@ -49,8 +49,8 @@ android {
         // works without asking for any storage permission at all.
         minSdk 29
         targetSdk 36
-        versionCode 17
-        versionName "1.4.2"
+        versionCode 18
+        versionName "1.5.0"
 
         buildConfigField "String", "UU_COMMIT", "\"${uuCommit}${uuDirty ? "-dirty" : ""}\""
         buildConfigField "boolean", "UU_FFMPEG", "${uuFfmpeg}"
