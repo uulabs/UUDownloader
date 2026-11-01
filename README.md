@@ -62,6 +62,8 @@ agent, because CDNs commonly refuse an unfamiliar one.
 > install the universal or architecture-specific build: those only open the release page, and
 > Play Protect has nothing to object to.
 
+![Play Protect asking to scan the autoupdate build](docs/shot-play-protect.png)
+
 ```sh
 adb install -r UUDownloader-1.6.1-arm64.apk
 ```
