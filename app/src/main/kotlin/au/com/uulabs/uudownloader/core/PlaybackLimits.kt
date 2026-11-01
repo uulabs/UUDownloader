@@ -1,15 +1,19 @@
 package au.com.uulabs.uudownloader.core
 
 /**
- * The video formats that matter, best compression first. Sites name them differently, so each is
- * a pattern: YouTube says "vp9" for one stream and "vp09.00.41.08" for the next, and plenty of
- * sites just say "h264".
+ * The video formats that matter, the most widely playable first. A phone's hardware decoder is not
+ * the whole story: its gallery, or the next app the file is shared to, may still refuse VP9 in an
+ * MP4, while everything opens H.264. So at any given size H.264 wins, and the others are there for
+ * sizes it is not offered in.
+ *
+ * Sites name these differently, so each is a pattern: YouTube says "vp9" for one stream and
+ * "vp09.00.41.08" for the next, and plenty of sites just say "h264".
  */
 enum class VideoCodec(val ytDlpPattern: String) {
-    AV1("^av01"),
-    VP9("^vp0?9"),
-    HEVC("^(hev1|hvc1|hevc|h265)"),
     H264("^(avc1|avc3|h264)"),
+    HEVC("^(hev1|hvc1|hevc|h265)"),
+    VP9("^vp0?9"),
+    AV1("^av01"),
 }
 
 /**

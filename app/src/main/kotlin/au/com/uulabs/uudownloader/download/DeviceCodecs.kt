@@ -54,14 +54,26 @@ object DeviceCodecs {
             ?.shortEdge
             ?: 0
 
+    /**
+     * Whether this decoder can really manage a landscape picture of this size.
+     *
+     * Landscape is what gets asked, because the paper limits are not symmetrical. One real phone
+     * allows 1920 wide by 3840 tall, so a portrait 1440x2560 passes while the landscape video
+     * this check is meant to clear would be refused outright.
+     *
+     * Paper limits alone are not enough either. Measured frame rates decide where the phone
+     * publishes them, then its performance points, and with neither only 1080p30 is taken on trust.
+     */
     private fun plays(info: MediaCodecInfo, mime: String, long: Int, short: Int, fps: Int): Boolean = runCatching {
         val video = info.getCapabilitiesForType(mime).videoCapabilities ?: return false
-        val fitsOnPaper = video.areSizeAndRateSupported(long, short, fps.toDouble()) ||
-            video.areSizeAndRateSupported(short, long, fps.toDouble())
-        if (!fitsOnPaper) return false
-        // Some phones also publish what they measured. Where they do, that outranks the paper figure.
-        val measured = runCatching { video.getAchievableFrameRatesFor(long, short) }.getOrNull()
-            ?: return true
-        measured.upper >= fps * 0.9
+        if (!video.areSizeAndRateSupported(long, short, fps.toDouble())) return false
+        val measured = video.getAchievableFrameRatesFor(long, short)
+        if (measured != null) return measured.upper >= fps * 0.9
+        val points = video.supportedPerformancePoints
+        if (!points.isNullOrEmpty()) {
+            val wanted = MediaCodecInfo.VideoCapabilities.PerformancePoint(long, short, fps)
+            return points.any { it.covers(wanted) }
+        }
+        short <= 1080 && fps <= 30
     }.getOrDefault(false)
 }

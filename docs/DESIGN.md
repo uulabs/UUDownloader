@@ -47,10 +47,18 @@ and records the largest picture each manages at 30 and at 60 frames a second. On
 count, because software decoders accept 4K AV1 on paper and then stutter through it on a phone's CPU.
 The exception is H.264 up to 720p, which any phone's CPU can handle.
 
+Paper limits are not trusted on their own. Measured frame rates decide where a phone publishes them,
+then its performance points, and with neither only 1080p30 is taken on trust. Only the landscape
+figure is asked about: one real phone allows 1920 wide by 3840 tall, which passes a portrait 1440x2560
+and then refuses the landscape video. An early version of this checked both orientations and saved a
+1440p60 file that phone reported as unsupported.
+
 `PlaybackLimits` turns that into a list for yt-dlp, which takes the first entry that exists. It runs
 from the largest picture down, because resolution is what people notice, and each size band has a
 floor as well as a ceiling: without one, a 480p VP9 stream would satisfy "VP9 up to 4K" and beat the
-1080p H.264 stream beside it. Sizes are matched on the short edge, so a portrait 1080x1920 clip asks
+1080p H.264 stream beside it. At any given size H.264 comes first, because a hardware decoder is not
+the whole story: a gallery app or the next app the file is shared to may still refuse VP9 in an MP4,
+while everything opens H.264. The other codecs are there for sizes H.264 is not offered in. Sizes are matched on the short edge, so a portrait 1080x1920 clip asks
 the same of a decoder as a landscape 1920x1080 one. HDR streams are left out, and AAC audio is preferred.
 
 If a source offers nothing the phone can decode, it still saves something, kept within the phone's

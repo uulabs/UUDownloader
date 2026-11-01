@@ -629,4 +629,21 @@ class CoreTest {
         assertTrue(capped > 0, selector)
         assertTrue(capped < selector.indexOf("bv*[height<=2160]"), selector)
     }
+
+    @Test
+    fun `at any given size H264 comes first because everything opens it`() {
+        val phone = PlaybackLimits(
+            listOf(
+                CodecLimit(VideoCodec.AV1, 2160, 2160),
+                CodecLimit(VideoCodec.VP9, 2160, 2160),
+                CodecLimit(VideoCodec.HEVC, 2160, 2160),
+                CodecLimit(VideoCodec.H264, 1080, 1080),
+            ),
+        )
+        val at1080 = phone.alternatives("bv*").filter { "[height<=1920]" in it }
+        assertTrue(VideoCodec.H264.ytDlpPattern in at1080.first(), at1080.first())
+        // Above what H.264 reaches, the phone still gets the bigger picture it can play.
+        val first = phone.alternatives("bv*").first()
+        assertTrue("[height<=3840]" in first && VideoCodec.HEVC.ytDlpPattern in first, first)
+    }
 }
