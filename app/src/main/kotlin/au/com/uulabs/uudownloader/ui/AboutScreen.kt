@@ -20,8 +20,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -54,10 +52,9 @@ fun AboutScreen(onBack: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Image(
-                painter = painterResource(R.drawable.ic_stat_uu),
+                painter = painterResource(R.drawable.uu_mark),
                 contentDescription = null,
-                colorFilter = ColorFilter.tint(Uu.Text, BlendMode.Modulate),
-                modifier = Modifier.size(84.dp),
+                modifier = Modifier.size(96.dp),
             )
             Spacer(Modifier.height(22.dp))
             Text(
