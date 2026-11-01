@@ -184,6 +184,7 @@ fun HomeScreen(
                         MutedLine(
                             "${ByteSize.human(item.sizeBytes ?: 0L)} in your folder · the file stays unless you delete it",
                             color = Uu.Faint,
+                            maxLines = Int.MAX_VALUE,
                         )
                     }
                 }
@@ -222,6 +223,7 @@ fun HomeScreen(
                     "This empties the list. Deleting files also removes every video this app saved to " +
                         "${vm.destination.label} — that cannot be undone.",
                     color = Uu.Muted,
+                    maxLines = Int.MAX_VALUE,
                 )
             },
             confirmButton = {
@@ -269,7 +271,7 @@ fun HomeScreen(
                         )
                     }
                     Spacer(Modifier.height(10.dp))
-                    MutedLine("${item.siteLabel} · ${item.url}", color = Uu.Faint)
+                    MutedLine("${item.siteLabel} · ${item.url}", color = Uu.Faint, maxLines = Int.MAX_VALUE)
                 }
             },
             confirmButton = {

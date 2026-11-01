@@ -206,12 +206,12 @@ fun ProgressLane(progress: Float?, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun MutedLine(text: String, modifier: Modifier = Modifier, color: Color = Uu.Muted) {
+fun MutedLine(text: String, modifier: Modifier = Modifier, color: Color = Uu.Muted, maxLines: Int = 2) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodySmall,
         color = color,
-        maxLines = 2,
+        maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier,
     )

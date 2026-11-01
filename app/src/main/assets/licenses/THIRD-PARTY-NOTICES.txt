@@ -1,13 +1,9 @@
 UU Downloader
 Copyright (C) 2026 UU Labs
 
-This program is free software: you can redistribute it and/or modify it under the terms of the
-GNU General Public License as published by the Free Software Foundation, either version 3 of the
-License, or (at your option) any later version.
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
-even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-General Public License, which follows these notices, for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License, which follows these notices, for more details.
 
 Source code for this app: https://github.com/uulabs/UUDownloader
 Each release is built from the commit carrying its version tag.
@@ -39,10 +35,7 @@ QuickJS
   https://bellard.org/quickjs/
 
 Libraries packaged with FFmpeg and CPython
-  These native programs were built by the Termux project and arrive with the libraries they
-  link, including AOM, dav1d, FreeType, Fontconfig, FriBidi, GnuTLS, HarfBuzz, libass, LAME,
-  Opus, Vorbis, OpenSSL, SQLite, libffi, bzip2 and XZ Utils. Each keeps its own licence, and
-  those packages and their build recipes are published at
+  These native programs were built by the Termux project and arrive with the libraries they link, including AOM, dav1d, FreeType, Fontconfig, FriBidi, GnuTLS, HarfBuzz, libass, LAME, Opus, Vorbis, OpenSSL, SQLite, libffi, bzip2 and XZ Utils. Each keeps its own licence, and those packages and their build recipes are published at
   https://github.com/termux/termux-packages
 
 Android Jetpack (AndroidX), including Jetpack Compose
@@ -67,8 +60,7 @@ Guava ListenableFuture and JSpecify
   https://github.com/google/guava
   https://github.com/jspecify/jspecify
 
-The Apache License 2.0 is at https://www.apache.org/licenses/LICENSE-2.0. The notice files those
-libraries ship are kept inside the APK, in its META-INF folder.
+The Apache License 2.0 is at https://www.apache.org/licenses/LICENSE-2.0. The notice files those libraries ship are kept inside the APK, in its META-INF folder.
 
 
 THE GNU GENERAL PUBLIC LICENSE, VERSION 3

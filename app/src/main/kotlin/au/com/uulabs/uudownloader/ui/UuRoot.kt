@@ -110,6 +110,7 @@ fun UuRoot(vm: UuViewModel) {
                             "yt-dlp ${prompt.version} is available. Updating is what keeps YouTube and the rest working as they change."
                     },
                     color = Uu.Muted,
+                    maxLines = Int.MAX_VALUE,
                 )
             },
             confirmButton = {

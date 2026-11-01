@@ -140,6 +140,7 @@ fun SettingsScreen(
                 "Android won't let an app write into Download itself, so videos go in a folder " +
                     "inside it.",
                 color = Uu.Faint,
+                maxLines = Int.MAX_VALUE,
             )
 
             Spacer(Modifier.height(26.dp))
@@ -336,6 +337,7 @@ fun SettingsScreen(
                 "Export cookies.txt from a browser you're signed into, then pick it here. " +
                     "It stays on this device.",
                 color = Uu.Faint,
+                maxLines = Int.MAX_VALUE,
             )
 
             Spacer(Modifier.height(26.dp))

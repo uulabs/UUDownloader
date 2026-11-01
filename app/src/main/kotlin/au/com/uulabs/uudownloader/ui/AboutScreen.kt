@@ -97,6 +97,7 @@ fun AboutScreen(onBack: () -> Unit, onOpenLicences: () -> Unit) {
                     MutedLine(
                         "YouTube · TikTok · Instagram · Reddit · Facebook · X\nand most other video sites",
                         color = Uu.Text.copy(alpha = 0.8f),
+                        maxLines = Int.MAX_VALUE,
                     )
                     Spacer(Modifier.height(14.dp))
                     Eyebrow("Version")
