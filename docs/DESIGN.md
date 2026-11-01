@@ -4,7 +4,7 @@ These are the decisions that were not obvious, and what they cost.
 
 ## 1. The download engine is yt-dlp, and that is the whole design
 
-Every one of the five sites on the tin — YouTube, TikTok, Instagram, Facebook, X — actively
+Every one of the six sites on the tin — YouTube, TikTok, Instagram, Facebook, X, Reddit — actively
 breaks third-party extraction. TikTok rotates its endpoints, Instagram hides reels behind a
 session, X requires a token dance for some posts, and YouTube's signature handling changes
 monthly. A hand-written extractor would work for a fortnight.
@@ -15,12 +15,32 @@ downloader ships (Seal, ytdlnis). So the app embeds:
 - `youtubedl-android:library:0.18.1` — a bundled CPython, yt-dlp itself, and the JNI shim
 - `youtubedl-android:ffmpeg:0.18.1` — ffmpeg, so separate video and audio streams can be merged
 
-**Cost:** ~115 MB APK, `extractNativeLibs=true` (the runtime executes binaries out of
-`nativeLibraryDir`), and GPL-3.0 obligations. **Benefit:** the five sites work, and they keep
+**Cost:** a 54–61 MB APK per ABI, `extractNativeLibs=true` (the runtime executes binaries out of
+`nativeLibraryDir`), and GPL-3.0 obligations. **Benefit:** the six sites work, and they keep
 working as yt-dlp updates.
 
 A direct link (`…/clip.mp4`) skips all of this and goes through `HttpURLConnection`. The Python
-runtime takes seconds to start; a CDN file deserves none of that.
+runtime takes seconds to start; a CDN file deserves none of that. If the server answers with a web
+page instead of media, nothing is written and the job goes to yt-dlp, because a page saved as a
+video would report success and open as nothing.
+
+### yt-dlp names its own result
+
+The engine used to take the largest file in the job's folder. That was a guess, and it guessed
+wrong in the worst way: a refused HQ run could leave a video-only stream behind, which was then
+larger than the Normal file saved after it, so the user got a silent video and a success message.
+Now every attempt starts from an empty folder, and yt-dlp writes the path, title and playlist size
+to files beside the video (`--print-to-file`). A run that names no file produced no video.
+
+The same run is limited to one item. `--no-playlist` only covers a video that happens to sit in a
+playlist; a link that *is* a playlist or a channel would otherwise download all of it and keep one.
+Live streams are filtered out, because they never end.
+
+### One engine per process
+
+The screen and the service share a single `YtDlpEngine`, because what it guards is per process: the
+unpacked runtime, the file on disk, and whether that file is being replaced. Two instances meant
+the service could never see an update running on the screen's instance.
 
 ### The probe is a convenience, never a gate
 
@@ -28,7 +48,7 @@ To know whether "HQ" is worth offering, the app asks yt-dlp for the video's meta
 phone that can take 40 seconds. So the probe:
 
 - never blocks the Download button,
-- runs under its own process id with a 20-second watchdog that kills it,
+- runs under its own process id with a 45-second watchdog that kills it,
 - and only *removes* the HQ button when it has an answer.
 
 The alternative — a "checking…" spinner gating the primary action — makes a 40-second network
@@ -51,6 +71,15 @@ survives a reboot.
 Items are inserted with `IS_PENDING = 1` and published only after the bytes are copied: a
 cancelled download never leaves a half-file the user can tap.
 
+Filenames are capped in bytes as well as characters, because the filesystem counts bytes and 90
+Japanese characters are 270 of them, and they stop on a whole character so an emoji is never cut
+in half.
+
+The allowance has its own ledger rather than reading the history list. History keeps thirty rows
+for the screen; a video does not stop taking up room because its row scrolled away. Before each job
+and whenever Settings shows the figure, the ledger asks the provider which files still exist. A
+delete the system refuses keeps the row, because that row is the only way back to the file.
+
 `minSdk` is 29 because of `MediaStore.Downloads`; Android 10 is the floor that avoids the
 legacy-storage permission path entirely.
 
@@ -67,11 +96,23 @@ That means:
 Only terminal items are persisted (`HistoryStore`): a queued item that was never resumed would
 come back as a row spinning forever.
 
+The service enters the foreground once, as soon as it is started, and stays there until the queue
+is empty. Android will not let an app in the background re-enter the foreground, and sharing from
+another app is exactly when this app is in the background, so dropping out between two jobs would
+crash on the second. A watchdog on its own clock handles the storage limit and pending cancels,
+because progress lines are not guaranteed and a cancel can land before the process it should kill
+exists. A partial wake lock keeps the CPU up with the screen off, and Android 15's daily limit for
+this kind of service ends the job with a reason rather than a crash. Job folders left by a dead
+process are cleared at the next start.
+
 ## 4. Sharing leaves the app
 
 A share launch with a working destination enqueues, starts the service, shows a toast, and
-`finish()`es. The user stays in Instagram; the progress is in the shade. That is the entire
+closes its task. The user stays in Instagram; the progress is in the shade. That is the entire
 premise of the feature, so the app must not stand in front of it.
+
+A share is one request. The system hands the same intent back on rotation and from Recents, so it
+only counts on a genuinely new launch.
 
 Two exceptions keep the screen up: no notification permission (the user would see nothing at
 all), and a link the app cannot use.
@@ -83,7 +124,7 @@ to be black and tidy."* The icon became a matte black tile with a white mark, an
 followed: no accent colour, one lit thing per screen, white only for the primary action and
 progress.
 
-The launcher art is generated, not hand-drawn in a design tool: `icon/generate_icon.py` draws
+The launcher art is generated, not hand-drawn in a design tool: `icon/build_icon.py` draws
 every density (legacy, round, adaptive background and foreground) from one function so the
 mark cannot drift between them.
 
@@ -111,8 +152,12 @@ quietly once per install. That was wrong, and it cost a stalled download to find
 metadata fetch has no read timeout. A quiet update on a slow network therefore blocked the first
 download forever, on "Getting ready", with nothing on screen to explain it.
 
-The update is still here, but only where a person asks for it, and a job that starts during an
-update now says "Waiting for an engine update" instead of appearing hung.
+The update is still here, but only where a person asks for it. It no longer goes through the
+library at all: the library's updater holds that monitor, has no timeout and checks nothing. The
+app fetches the release itself with bounded timeouts, verifies it against yt-dlp's published
+SHA2-256SUMS, renames it into place only when no run is using the engine, and puts the old one back
+if the new one will not start. A job that arrives during the swap says "Waiting for an engine
+update".
 
 ## 6. Where the line is: accounts and regions
 
@@ -130,8 +175,13 @@ credentials are consent; forged ones are not.
 regimes some sites answer by refusing a whole region — the app reports the site's own error.
 A VPN on the phone is the phone's business and the app inherits it, because it has no network
 layer of its own: one `HttpURLConnection` per direct link, one yt-dlp child process otherwise,
-both on the system resolver. There is no proxy support, no fake locale, no header laundering,
-and adding a "bypass" mode to this app would be building a different, worse product.
+both on the system resolver. There is no proxy support and no fake locale, and adding a "bypass" mode to this app would be
+building a different, worse product.
+
+Two things sit closer to that line and are stated rather than hidden. On a YouTube bot check the
+app retries with yt-dlp's other client settings, because the check is aimed at the network and the
+same video is often served to another client. And the direct engine sends a phone browser's user
+agent, because CDNs commonly refuse an unfamiliar one.
 
 The honest position is also the useful one: everything that *is* publicly reachable works, and
 that is the overwhelming majority of what people share.
@@ -140,7 +190,7 @@ that is the overwhelming majority of what people share.
 
 - **No playback.** Saving is the job; opening the file is one tap away and the system owns it.
 - **No account, no server, no upload.** The only network traffic is the request to fetch the
-  video, made by the device.
+  video and the update check against GitHub, both made by the device.
 - **No queue UI, no thumbnails.** One active download, a short recent list, done.
 - **No download-on-Wi-Fi-only switch.** It was considered and cut: the notification already
   shows speed, and a wrong guess about the user's data plan is worse than none.

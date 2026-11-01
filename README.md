@@ -21,7 +21,8 @@ and paste one.
 - **Progress you can act on.** A silent foreground notification reports percent, size, speed and
   ETA, with a cancel action. Completed files get their own notification.
 - **Storage allowance.** A limit in gigabytes or a percentage of the device, enforced before a
-  download starts and while it runs.
+  download starts and while it runs. It counts every file the app saved and has not let go of,
+  and stops counting a file once it has been deleted, wherever that happened.
 - **Update checks for both the app and its engine**, with the engine updatable in place.
 - **Optional sign-in.** A `cookies.txt` exported from a browser can be imported for sites that
   refuse anonymous requests. Nothing is signed in by default.
@@ -36,8 +37,12 @@ Adult sites are supported where the engine supports them. The app keeps no catal
 not list them.
 
 Requests go out on the device's own connection. The app runs no proxy, tunnel or VPN of its own,
-and never attempts to defeat an access control: when a site refuses a region, demands a sign-in
-or refuses a request as automated, the app reports the site's message and stops.
+and adds nothing to get past a region block or a sign-in: it reports the site's message and stops.
+
+Two things are worth being plain about. When YouTube refuses a request as automated, the app
+retries with the other client settings yt-dlp offers (`tv`, `web_safari`, `ios`, `android_vr`)
+before reporting the refusal. And the direct engine identifies itself with a phone browser's user
+agent, because CDNs commonly refuse an unfamiliar one.
 
 ## Installation
 
@@ -48,7 +53,7 @@ or refuses a request as automated, the app reports the site's message and stops.
 | `UUDownloader-<version>-universal.apk` | both architectures in one file |
 
 ```sh
-adb install -r UUDownloader-1.5.0-arm64.apk
+adb install -r UUDownloader-1.6.0-arm64.apk
 ```
 
 Releases are signed with a dedicated UU Labs key, so a newer build installs over an older one
@@ -72,7 +77,9 @@ The app does not download or install APKs itself. That behaviour is what Google 
 classifies as a dropper, and removing it is what keeps the app out of that category.
 
 **Settings → Download engine → Update** fetches the current yt-dlp from its own release feed.
-This is independent of app updates and is the first thing to try when a site stops working.
+This is independent of app updates and is the first thing to try when a site stops working. The
+download is checked against the checksums yt-dlp publishes, and it has to start and report the
+right version, or the previous engine stays in place. It does not run during a download.
 
 ## Build
 
@@ -86,7 +93,8 @@ Requires JDK 17+ and an Android SDK with platform 36.
 ```
 
 Release signing reads `SigningKeys/keystore.properties`, which is not in the repository. Without
-it the build succeeds and warns that the APK is unsigned.
+it the build succeeds and warns that the APK is unsigned. A release build refuses a tree with
+uncommitted changes, because the source for a release has to be what its tag says.
 
 ### Size
 
@@ -113,8 +121,29 @@ then limited to its best pre-muxed stream, usually 720p.
 ./gradlew :app:testDebugUnitTest
 ```
 
-21 unit tests cover link parsing, quality selection, filename safety, progress parsing, the
-storage allowance, and the update version comparison.
+Unit tests cover link parsing, what yt-dlp is asked for, filename safety, error wording, the
+storage ledger, version comparison and engine checksums. CI runs them, lint and a debug build on
+every push.
+
+Device tests run the whole path on a real Android runtime, from a cleared install, against a web
+server on the device: first-run unpacking, the service, the queue, cancelling, sharing, cookies and
+what lands in Downloads. They need an ARM emulator or phone, named explicitly:
+
+```sh
+ANDROID_SERIAL=emulator-5554 tools/device-check.sh
+```
+
+### Releasing
+
+Bump `versionCode` and `versionName`, commit to `main`, tag the commit `v<version>`, then:
+
+```sh
+tools/release.sh build
+tools/release.sh publish notes.md
+```
+
+`build` refuses a dirty tree, an untagged commit or a signing key anyone else can read. It checks
+each APK's certificate and the commit it names before writing `dist/`.
 
 ## Architecture
 
@@ -125,12 +154,13 @@ Two download engines, selected by the link:
 | media file (`.mp4`, `.webm`, `.mov`, …) | direct HTTP |
 | anything else | yt-dlp on a bundled CPython, via [youtubedl-android](https://github.com/yausername/youtubedl-android) 0.18.1, with its ffmpeg module |
 
-A current yt-dlp is bundled in the APK and installed into the wrapper's directory on first use.
-A marker records the installed version, so a bundled copy never replaces a newer engine fetched
-with **Update**.
+A current yt-dlp is bundled in the APK, pinned by hash in `app/build.gradle`, and installed into
+the wrapper's directory on first use. A marker records the installed version, so a bundled copy
+never replaces a newer engine fetched with **Update**.
 
-A single foreground service runs the queue; the screen and the notification read the same
-in-memory state. Only completed downloads are persisted.
+A single foreground service runs the queue and stays in the foreground until the queue is empty;
+the screen and the notification read the same in-memory state. Only completed downloads are
+persisted. yt-dlp reports which file it finished, so nothing is guessed from the folder.
 
 ```
 app/src/main/kotlin/au/com/uulabs/uudownloader/
@@ -149,17 +179,21 @@ docs/          design notes and the screenshots above
 | --- | --- |
 | `INTERNET`, `ACCESS_NETWORK_STATE` | downloading |
 | `POST_NOTIFICATIONS` | progress and completion |
-| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC` | keeping a download alive with the screen off |
+| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC`, `WAKE_LOCK` | keeping a download alive with the screen off |
 
 No analytics, no crash reporting, no account, no server. Videos are fetched by the device and
-saved to the device.
+saved to the device. The only other network traffic is the update check against GitHub.
+
+Imported cookies and the download list are excluded from backups and device transfers. Each run of
+the engine gets a throwaway copy of the cookies, so removing them in Settings is final. Release
+builds do not write links, titles or video ids to the system log.
 
 ## Troubleshooting
 
 **YouTube reports "sign in to confirm you're not a bot", "The page needs to be reloaded" or a
 403.** These are network-level checks aimed at the address, not the video. The app retries as
-the `tv`, `web_safari` and `ios` clients before reporting a failure. If all are refused, update
-the engine, then import browser cookies if it still fails.
+the `tv`, `web_safari`, `ios` and `android_vr` clients before reporting a failure. If all are
+refused, update the engine, then import browser cookies if it still fails.
 
 **A message quoting the site** — *"This video is private"*, *"Your IP address is blocked from
 accessing this post"*, *"Account authentication is required"* — is the site's own refusal, and
@@ -172,14 +206,20 @@ copy button.
 
 - Some posts require a signed-in session (Reddit's video API refuses anonymous clients; Instagram,
   Facebook and X gate some content). Import cookies if you need them.
-- Region-blocked and private videos cannot be downloaded, and neither can live streams.
+- Region-blocked and private videos cannot be downloaded. A live stream is refused until it has
+  ended.
+- A link to a playlist, channel or multi-video post saves its first video, and says so when the
+  site reports how many there are.
 - Quality is whatever the source offers.
 - One download runs at a time; further links wait in the queue.
 
 ## Licence
 
-`youtubedl-android` is GPL-3.0, which makes this application GPL-3.0 as a whole. Corresponding
-source is this repository. yt-dlp is Unlicense; CPython and ffmpeg carry their own licences.
+GPL-3.0 or later; the full text is in [LICENSE](LICENSE). `youtubedl-android` is GPL-3.0, which
+makes this application GPL-3.0 as a whole. Corresponding source is this repository at the tag of
+each release. Everything else the app ships is listed in
+[THIRD-PARTY-NOTICES.txt](app/src/main/assets/licenses/THIRD-PARTY-NOTICES.txt), which the app shows
+under **Settings → About**.
 
 ---
 

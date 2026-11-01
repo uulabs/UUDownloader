@@ -54,7 +54,7 @@ Kotlin standard library and kotlinx.coroutines
   https://github.com/JetBrains/kotlin
   https://github.com/Kotlin/kotlinx.coroutines
 
-Apache Commons Compress, Commons IO and Commons Lang
+Apache Commons Compress and Commons IO
   Apache License 2.0
   https://commons.apache.org/
 
@@ -62,7 +62,7 @@ Jackson
   Apache License 2.0
   https://github.com/FasterXML/jackson
 
-Guava and JSpecify
+Guava ListenableFuture and JSpecify
   Apache License 2.0
   https://github.com/google/guava
   https://github.com/jspecify/jspecify
