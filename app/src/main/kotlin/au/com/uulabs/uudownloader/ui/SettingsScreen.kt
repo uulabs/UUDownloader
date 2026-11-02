@@ -288,11 +288,14 @@ fun SettingsScreen(
                             color = Uu.Danger,
                         )
                         Spacer(Modifier.height(5.dp))
-                        MutedLine(
-                            "Downloading and installing an APK is what Play Protect reports as a " +
-                                "harmful app, and that report is correct about the behaviour. If you " +
-                                "would rather not see it, use the universal or architecture-specific " +
-                                "build instead — those only open the release page.",
+                        // Full text, not MutedLine: that clamps to two lines and this is the
+                        // one paragraph in the app that must not be cut off.
+                        Text(
+                            text = "Downloading and installing an APK is what Play Protect reports " +
+                                "as a harmful app, and that report is correct about the behaviour. " +
+                                "If you would rather not see it, use the universal or " +
+                                "architecture-specific build instead — those only open the release page.",
+                            style = MaterialTheme.typography.bodySmall,
                             color = Uu.Text.copy(alpha = 0.75f),
                         )
                     }
@@ -413,7 +416,11 @@ fun SettingsScreen(
 @Composable
 private fun StoragePanel(vm: UuViewModel) {
     val limit = vm.storageLimit
-    val limitBytes = StorageLimit.limitBytes(LocalContext.current, limit)
+    val context = LocalContext.current
+    val limitBytes = StorageLimit.limitBytes(context, limit)
+    val totalBytes = StorageLimit.deviceTotalBytes(context)
+    val freeBytes = StorageLimit.deviceFreeBytes(context)
+    val deviceUsed = (totalBytes - freeBytes).coerceAtLeast(0L)
     val used = vm.usageBytes
     val fraction = if (limitBytes > 0) (used.toFloat() / limitBytes).coerceIn(0f, 1f) else 0f
     val value = when (limit.mode) {
@@ -515,6 +522,25 @@ private fun StoragePanel(vm: UuViewModel) {
                 }
             }
 
+            // What the percentage is a percentage of, and what the phone has left: a limit in
+            // percent means nothing until the capacity it is measured against is on the screen.
+            Spacer(Modifier.height(14.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MutedLine("Phone storage", color = Uu.Faint)
+                Spacer(Modifier.weight(1f))
+                MutedLine(ByteSize.human(totalBytes), color = Uu.Muted)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MutedLine(
+                    "${ByteSize.human(deviceUsed)} used \u00b7 ${ByteSize.human(freeBytes)} free",
+                    color = Uu.Faint,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            MutedLine(
+                text = limit.explain(totalBytes),
+                color = if (limit.mode == LimitMode.PERCENT) Uu.Text.copy(alpha = 0.8f) else Uu.Faint,
+            )
             MutedLine("Downloads stop when this is reached.", color = Uu.Faint)
         }
     }

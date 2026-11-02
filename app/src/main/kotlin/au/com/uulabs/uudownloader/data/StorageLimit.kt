@@ -33,6 +33,11 @@ data class StorageLimit(val mode: LimitMode, val gigabytes: Int, val percent: In
             StatFs(context.filesDir.absolutePath).totalBytes
         }.getOrDefault(0L)
 
+        /** What is left on the phone right now, for the one line that gives the rest context. */
+        fun deviceFreeBytes(context: Context): Long = runCatching {
+            StatFs(context.filesDir.absolutePath).availableBytes
+        }.getOrDefault(0L)
+
         fun limitBytes(context: Context, limit: StorageLimit): Long =
             limit.bytes(deviceTotalBytes(context))
     }
@@ -46,6 +51,18 @@ data class StorageLimit(val mode: LimitMode, val gigabytes: Int, val percent: In
     fun describe(): String = when (mode) {
         LimitMode.GIGABYTES -> "$gigabytes GB"
         LimitMode.PERCENT -> "$percent% of the phone's storage"
+    }
+
+    /**
+     * What a percentage is a percentage *of*.
+     *
+     * "10%" on its own is not a limit anybody can picture; against the phone's capacity it is a
+     * number of gigabytes, and that is the sentence shown under the control.
+     */
+    fun explain(totalInternalBytes: Long): String = when (mode) {
+        LimitMode.GIGABYTES -> "of ${ByteSize.human(totalInternalBytes)} on this phone"
+        LimitMode.PERCENT ->
+            "$percent% of ${ByteSize.human(totalInternalBytes)} = ${ByteSize.human(bytes(totalInternalBytes))}"
     }
 
 }

@@ -208,6 +208,17 @@ class CoreTest {
     }
 
     @Test
+    fun `a percentage says what it is a percentage of`() {
+        val percent = StorageLimit(LimitMode.PERCENT, gigabytes = 5, percent = 10)
+        // Ten percent of a 128 GB phone is 12.8 GB, and the sentence has to say so: the number
+        // alone is what made the control meaningless.
+        assertEquals("10% of 128.0 GB = 12.8 GB", percent.explain(128_000_000_000L))
+
+        val fixed = StorageLimit(LimitMode.GIGABYTES, gigabytes = 5, percent = 10)
+        assertEquals("of 128.0 GB on this phone", fixed.explain(128_000_000_000L))
+    }
+
+    @Test
     fun `sizes read the way a person says them`() {
         assertEquals("476 KB", ByteSize.human(476_000))
         assertEquals("12 MB", ByteSize.human(12_400_000))

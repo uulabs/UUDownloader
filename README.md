@@ -22,8 +22,9 @@ and paste one.
   through the system picker.
 - **Progress you can act on.** A silent foreground notification reports percent, size, speed and
   ETA, with a cancel action. Completed files get their own notification.
-- **Storage allowance.** A limit in gigabytes or a percentage of the device, enforced before a
-  download starts and while it runs. It counts every file the app saved and has not let go of,
+- **Storage allowance.** A limit in gigabytes or as a percentage of the phone's capacity, shown
+  against what the phone actually holds (used, free and total) so the percentage has a size.
+  Enforced before a download starts and while it runs. It counts every file the app saved and has not let go of,
   and stops counting a file once it has been deleted, wherever that happened.
 - **Update checks for both the app and its engine**, with the engine updatable in place.
 - **Optional sign-in.** A `cookies.txt` exported from a browser can be imported for sites that
